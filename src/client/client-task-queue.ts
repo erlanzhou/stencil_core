@@ -12,12 +12,12 @@ const queueDomReads: d.RafCallback[] = [];
 const queueDomWrites: d.RafCallback[] = [];
 const queueDomWritesLow: d.RafCallback[] = [];
 
-const queueTask = (queue: d.RafCallback[], write: boolean) => (cb: d.RafCallback) => {
+const queueTask = (queue: d.RafCallback[]) => (cb: d.RafCallback) => {
   queue.push(cb);
 
   if (!queuePending) {
     queuePending = true;
-    if (write && plt.$flags$ & PLATFORM_FLAGS.queueSync) {
+    if (plt.$flags$ & PLATFORM_FLAGS.queueSync) {
       nextTick(flush);
     } else {
       plt.raf(flush);
@@ -91,13 +91,17 @@ const flush = () => {
     if ((queuePending = queueDomReads.length > 0)) {
       // still more to do yet, but we've run out of time
       // let's let this thing cool off and try again in the next tick
-      plt.raf(flush);
+      if (plt.$flags$ & PLATFORM_FLAGS.queueSync) {
+        nextTick(flush);
+      } else {
+        plt.raf(flush);
+      }
     }
   }
 };
 
 export const nextTick = (cb: () => void) => promiseResolve().then(cb);
 
-export const readTask = /*@__PURE__*/ queueTask(queueDomReads, false);
+export const readTask = /*@__PURE__*/ queueTask(queueDomReads);
 
-export const writeTask = /*@__PURE__*/ queueTask(queueDomWrites, true);
+export const writeTask = /*@__PURE__*/ queueTask(queueDomWrites);

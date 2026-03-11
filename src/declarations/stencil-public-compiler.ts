@@ -2641,6 +2641,23 @@ export interface OutputTargetDistCustomElements extends OutputTargetValidationCo
    */
   customElementsExportBehavior?: CustomElementsExportBehavior;
   /**
+   * **Experimental**: Forces the runtime to use a synchronous task queue.
+   *
+   * This option is designed to eliminate Flash of Unstyled Content (FOUC) when using `dist-custom-elements`
+   * in environments that expect synchronous rendering (e.g., Vue or React wrappers).
+   *
+   * **Requirements:**
+   * This option strictly requires the global `taskQueue` config to be set to `'immediate'`.
+   * If `taskQueue` is not `'immediate'`, the build will fail with an error.
+   *
+   * **Behavior:**
+   * When enabled, it forces `writeTask` and `readTask` to execute immediately,
+   * bypassing the `requestAnimationFrame` loop entirely.
+   *
+   * @default false
+   */
+  experimentalSyncQueue?: boolean;
+  /**
    * Generate an auto-loader script that uses MutationObserver to lazily load
    * and define custom elements as they appear in the DOM.
    *

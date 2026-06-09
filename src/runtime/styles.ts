@@ -28,18 +28,17 @@ export const rootAppliedStyles: d.RootAppliedStyleMap = /*@__PURE__*/ new WeakMa
  * @param cssText styles for the component of interest
  * @param allowCS whether or not to use a constructable stylesheet
  */
-export const registerStyle = (scopeId: string, cssText: string, allowCS: boolean) => {
-  let style = styles.get(scopeId);
-  if (supportsConstructableStylesheets && allowCS) {
-    style = (style || new CSSStyleSheet()) as CSSStyleSheet;
-    if (typeof style === 'string') {
-      style = cssText;
-    } else {
-      style.replaceSync(cssText);
-    }
-  } else {
-    style = cssText;
+export const registerStyle = (scopeId: string, cssText: string, _allowCS: boolean) => {
+  if (!supportsConstructableStylesheets) {
+    throw new Error('Constructable stylesheets with replaceSync() are required in this runtime profile.');
   }
+
+  let style = styles.get(scopeId) as CSSStyleSheet | undefined;
+  if (!(style instanceof CSSStyleSheet)) {
+    style = new CSSStyleSheet();
+  }
+  style.replaceSync(cssText);
+
   styles.set(scopeId, style);
 };
 

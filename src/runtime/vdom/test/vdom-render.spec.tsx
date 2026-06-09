@@ -1,7 +1,94 @@
+import { BUILD } from '@app-data';
+
 import { h, newVNode } from '../h';
-import { isSameVnode, patch } from '../vdom-render';
+import { isSameVnode, patch, renderVdom } from '../vdom-render';
 
 describe('template elements', () => {
+  it('should not apply non-shadow slot relocation even when BUILD.slotRelocation is true', () => {
+    const previous = BUILD.slotRelocation;
+    BUILD.slotRelocation = true;
+
+    try {
+      const hostElm = document.createElement('div');
+      const vnode0 = newVNode(null, null);
+      vnode0.$elm$ = hostElm;
+
+      patch(vnode0, h('div', null, h('slot', { name: 'start' }, 'fallback')));
+
+      expect(hostElm.querySelector('slot')).not.toBeNull();
+      expect(hostElm.querySelector('slot-fb')).toBeNull();
+    } finally {
+      BUILD.slotRelocation = previous;
+    }
+  });
+
+  it('should not inject scoped class names even when BUILD.scoped is true', () => {
+    const previous = BUILD.scoped;
+    BUILD.scoped = true;
+
+    try {
+      const hostElm = document.createElement('x-host') as any;
+      hostElm['s-sc'] = 'sc-test';
+
+      const hostRef: any = {
+        $flags$: 0,
+        $cmpMeta$: {
+          $flags$: 0,
+          $tagName$: 'x-host',
+        },
+        $hostElement$: hostElm,
+      };
+
+      renderVdom(hostRef, h('div', null, 'value'));
+      expect(hostElm.querySelector('div')?.classList.contains('sc-test')).toBe(false);
+    } finally {
+      BUILD.scoped = previous;
+    }
+  });
+
+  it('should still render text nodes when BUILD.vdomText is false', () => {
+    const previous = BUILD.vdomText;
+    BUILD.vdomText = false;
+
+    try {
+      const hostElm = document.createElement('div');
+      const vnode0 = newVNode(null, null);
+      vnode0.$elm$ = hostElm;
+
+      patch(vnode0, h('div', null, 'text-content'));
+
+      expect(hostElm.textContent).toBe('text-content');
+    } finally {
+      BUILD.vdomText = previous;
+    }
+  });
+
+  it('should render into shadow root even when BUILD.shadowDom is false', () => {
+    const previous = BUILD.shadowDom;
+    BUILD.shadowDom = false;
+
+    try {
+      const hostElm = document.createElement('x-host');
+      const shadowRoot = hostElm.attachShadow({ mode: 'open' });
+
+      const hostRef: any = {
+        $flags$: 0,
+        $cmpMeta$: {
+          $flags$: 0,
+          $tagName$: 'x-host',
+        },
+        $hostElement$: hostElm,
+      };
+
+      renderVdom(hostRef, h('div', null, 'shadow-content'));
+
+      expect(shadowRoot.textContent).toBe('shadow-content');
+      expect(hostElm.textContent).toBe('');
+    } finally {
+      BUILD.shadowDom = previous;
+    }
+  });
+
   it('should append children to template.content, not template directly', () => {
     const hostElm = document.createElement('div');
     const vnode0 = newVNode(null, null);
@@ -89,7 +176,7 @@ describe('isSameVnode', () => {
       $elm$: { nodeType: 9 },
     };
     expect(isSameVnode(vnode1, vnode2)).toBe(true);
-    expect(isSameVnode(vnode3, vnode4)).toBe(true);
+    expect(isSameVnode(vnode3, vnode4)).toBe(false);
   });
 
   it('should add key to old node (e.g. via hydration) on init', () => {

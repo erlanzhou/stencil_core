@@ -6,7 +6,6 @@ import { createOnWarnFn, isString, loadRollupDiagnostics } from '@utils';
 import { type ObjectHook, PluginContext, rollup, RollupOptions, TreeshakingOptions } from 'rollup';
 
 import type * as d from '../../declarations';
-import { lazyComponentPlugin } from '../output-targets/dist-lazy/lazy-component-plugin';
 import { appDataPlugin } from './app-data-plugin';
 import type { BundleOptions } from './bundle-interface';
 import { coreResolvePlugin } from './core-resolve-plugin';
@@ -14,6 +13,7 @@ import { devNodeModuleResolveId } from './dev-node-module-resolve';
 import { extFormatPlugin } from './ext-format-plugin';
 import { extTransformsPlugin } from './ext-transforms-plugin';
 import { fileLoadPlugin } from './file-load-plugin';
+import { lazyComponentPlugin } from './lazy-component-plugin';
 import { loaderPlugin } from './loader-plugin';
 import { pluginHelper } from './plugin-helper';
 import { serverPlugin } from './server-plugin';

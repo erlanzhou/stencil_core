@@ -237,25 +237,9 @@ export const WWW = 'www';
  * Stencil config. This is enforced in the output target validation code.
  */
 export const VALID_CONFIG_OUTPUT_TARGETS = [
-  // DIST
-  WWW,
-  DIST,
-  DIST_COLLECTION,
+  // supported runtime/compiler targets in this reduced profile
   DIST_CUSTOM_ELEMENTS,
-  DIST_LAZY,
-  DIST_HYDRATE_SCRIPT,
-
-  // DOCS
-  DOCS_JSON,
-  DOCS_README,
-  DOCS_VSCODE,
   DOCS_CUSTOM,
-  DOCS_CUSTOM_ELEMENTS_MANIFEST,
-
-  // MISC
-  COPY,
-  CUSTOM,
-  STATS,
 ] as const;
 
 export const GENERATED_DTS = 'components.d.ts';

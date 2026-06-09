@@ -3,6 +3,8 @@ module.exports = {
     '@app-data': '<rootDir>/internal/app-data/index.cjs',
     '@app-globals': '<rootDir>/internal/app-globals/index.cjs',
     '@platform': '<rootDir>/internal/testing/index.js',
+    '@render-kernel': '<rootDir>/src/render-kernel/index.ts',
+    '^@render-kernel/(.*)$': '<rootDir>/src/render-kernel/$1',
     '@runtime': '<rootDir>/internal/testing/index.js',
     '@stencil/core/cli': '<rootDir>/cli/index.cjs',
     '@stencil/core/compiler': '<rootDir>/compiler/stencil.js',

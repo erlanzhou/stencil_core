@@ -2,7 +2,6 @@ import { mockValidatedConfig } from '@stencil/core/testing';
 import { join, resolve } from '@utils';
 
 import type * as d from '../../../declarations';
-import { validateWww } from '../../config/outputs/validate-www';
 import { getWriteFilePathFromUrlPath } from '../prerendered-write-path';
 
 describe('prerender-utils', () => {
@@ -14,7 +13,19 @@ describe('prerender-utils', () => {
 
     beforeEach(() => {
       config = mockValidatedConfig();
-      const outputTargets = validateWww(config, [], []);
+      const outputTargets: d.OutputTargetWww[] = [
+        {
+          type: 'www',
+          baseUrl: '/',
+          dir: join(rootDir, 'www'),
+          appDir: join(rootDir, 'www'),
+          buildDir: join(rootDir, 'www', 'build'),
+          indexHtml: join(rootDir, 'www', 'index.html'),
+          empty: true,
+          polyfills: false,
+          copy: [],
+        } as d.OutputTargetWww,
+      ];
 
       manager = {
         config: config,

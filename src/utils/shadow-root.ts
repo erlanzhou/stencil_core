@@ -28,6 +28,10 @@ export function createShadowRoot(this: HTMLElement, cmpMeta: d.ComponentRuntimeM
 
   const shadowRoot = this.attachShadow(opts);
 
+  if (!supportsConstructableStylesheets) {
+    throw new Error('Constructable stylesheets are required in this runtime profile.');
+  }
+
   // Initialize if undefined, set to CSSStyleSheet or null
   if (globalStyleSheet === undefined) globalStyleSheet = createStyleSheetIfNeededAndSupported(globalStyles) ?? null;
 
@@ -38,17 +42,12 @@ export function createShadowRoot(this: HTMLElement, cmpMeta: d.ComponentRuntimeM
     } else {
       shadowRoot.adoptedStyleSheets = [...shadowRoot.adoptedStyleSheets, globalStyleSheet];
     }
-  } else if (globalStyles && !supportsConstructableStylesheets) {
-    // Fallback for dev mode: add global styles as <style> tag in each shadow root
-    // Each shadow root needs its own copy when using <style> tags
+  } else if (globalStyles) {
     const styleElm = document.createElement('style');
     styleElm.innerHTML = globalStyles;
-
-    // Add sty-id attribute for HMR tracking
     if (BUILD.hotModuleReplacement) {
       styleElm.setAttribute(HYDRATED_STYLE_ID, GLOBAL_STYLE_ID);
     }
-
     shadowRoot.prepend(styleElm);
   }
 }

@@ -40,7 +40,7 @@ export const BUILD: BuildConditionals = {
   prop: true,
   propMutable: true,
   reflect: true,
-  scoped: true,
+  scoped: false,
   shadowDom: true,
   slot: true,
   cssAnnotations: true,
@@ -71,7 +71,7 @@ export const BUILD: BuildConditionals = {
   lifecycleDOMEvents: false,
   lazyLoad: false,
   profile: false,
-  slotRelocation: true,
+  slotRelocation: false,
   // TODO(STENCIL-914): remove this option when `experimentalSlotFixes` is the default behavior
   appendChildSlotFix: false,
   // TODO(STENCIL-914): remove this option when `experimentalSlotFixes` is the default behavior

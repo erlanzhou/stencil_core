@@ -14,7 +14,7 @@ describe('output-utils tests', () => {
       expect(isValidConfigOutputTarget(outputTargetType)).toBe(true);
     });
 
-    it.each(['', 'my-target-that-i-made-up', DIST_TYPES])(
+    it.each(['', 'my-target-that-i-made-up', DIST_TYPES, 'www'])(
       'should return false for invalid config output type "%s"',
       (outputTargetType) => {
         expect(isValidConfigOutputTarget(outputTargetType)).toBe(false);
@@ -23,7 +23,7 @@ describe('output-utils tests', () => {
   });
 
   describe('isEligiblePrimaryPackageOutputTarget', () => {
-    it.each<(typeof VALID_CONFIG_OUTPUT_TARGETS)[number]>([
+    it.each<string>([
       'copy',
       'custom',
       'dist-hydrate-script',

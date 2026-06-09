@@ -1,3 +1,4 @@
+import { BUILD } from '@app-data';
 import { SVG_NS } from '@utils';
 
 import type * as d from '../../../declarations';
@@ -16,6 +17,19 @@ describe('renderer', () => {
   });
 
   describe('created element', () => {
+    it('should still create svg namespace elements when BUILD.svg is false', () => {
+      const previous = BUILD.svg;
+      BUILD.svg = false;
+
+      try {
+        patch(vnode0, h('svg', null, h('circle', null)));
+
+        expect((hostElm.firstElementChild as SVGElement).namespaceURI).toEqual(SVG_NS);
+      } finally {
+        BUILD.svg = previous;
+      }
+    });
+
     it('has tag', () => {
       patch(vnode0, h('div', null));
       expect(hostElm.tagName).toEqual('DIV');

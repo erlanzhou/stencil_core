@@ -10,7 +10,6 @@ export type {
   EventEmitter,
   EventOptions,
   FunctionalComponent,
-  FunctionalUtilities,
   JSX,
   ListenOptions,
   ListenTargetOptions,

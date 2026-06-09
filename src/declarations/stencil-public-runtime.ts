@@ -685,66 +685,29 @@ export interface HostAttributes {
 }
 
 /**
- * Utilities for working with functional Stencil components. An object
- * conforming to this interface is passed by the Stencil runtime as the third
- * argument to a functional component, allowing component authors to work with
- * features like children.
- *
- * The children of a functional component will be passed as the second
- * argument, so a functional component which uses these utils to transform its
- * children might look like the following:
+ * Functional Stencil components receive their children as the second
+ * argument. A component which transforms children might look like:
  *
  * ```ts
- * export const AddClass: FunctionalComponent = (_, children, utils) => (
- *  utils.map(children, child => ({
- *    ...child,
- *    vattrs: {
- *      ...child.vattrs,
- *      class: `${child.vattrs.class} add-class`
- *    }
- *  }))
- * );
+ * export const AddClass: FunctionalComponent = (_, children) =>
+ *   children.map((child) => ({
+ *     ...child,
+ *     $attrs$: {
+ *       ...child.$attrs$,
+ *       class: `${child.$attrs$?.class ?? ''} add-class`.trim(),
+ *     },
+ *   }));
  * ```
  *
  * For more see the Stencil documentation, here:
  * https://stenciljs.com/docs/functional-components
  */
-export interface FunctionalUtilities {
-  /**
-   * Utility for reading the children of a functional component at runtime.
-   * Since the Stencil runtime uses a different interface for children it is
-   * not recommended to read the children directly, and is preferable to use
-   * this utility to, for instance, perform a side effect for each child.
-   */
-  forEach: (children: VNode[], cb: (vnode: ChildNode, index: number, array: ChildNode[]) => void) => void;
-  /**
-   * Utility for transforming the children of a functional component. Given an
-   * array of children and a callback this will return a list of the results of
-   * passing each child to the supplied callback.
-   */
-  map: (children: VNode[], cb: (vnode: ChildNode, index: number, array: ChildNode[]) => ChildNode) => VNode[];
-}
-
 export interface FunctionalComponent<T = {}> {
-  (props: T, children: VNode[], utils: FunctionalUtilities): VNode | VNode[] | null;
+  (props: T, children: VNode[]): VNode | VNode[] | null;
 }
 
-/**
- * A Child VDOM node
- *
- * This has most of the same properties as {@link VNode} but friendlier names
- * (i.e. `vtag` instead of `$tag$`, `vchildren` instead of `$children$`) in
- * order to provide a friendlier public interface for users of the
- * {@link FunctionalUtilities}).
- */
-export interface ChildNode {
-  vtag?: string | number | Function;
-  vkey?: string | number;
-  vtext?: string;
-  vchildren?: VNode[];
-  vattrs?: any;
-  vname?: string;
-}
+/** @deprecated Use {@link VNode} directly. */
+export type ChildNode = VNode;
 
 /**
  * Host is a functional component can be used at the root of the render function

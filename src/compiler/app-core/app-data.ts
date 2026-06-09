@@ -21,7 +21,7 @@ export * from '../../app-data';
 export const getBuildFeatures = (cmps: ComponentCompilerMeta[]): BuildFeatures => {
   const slot = cmps.some((c) => c.htmlTagNames.includes('slot'));
   const shadowDom = cmps.some((c) => c.encapsulation === 'shadow');
-  const slotRelocation = cmps.some((c) => c.encapsulation !== 'shadow' && c.htmlTagNames.includes('slot'));
+  const slotRelocation = false;
   const f: BuildFeatures = {
     allRenderFn: cmps.every((c) => c.hasRenderFn),
     formAssociated: cmps.some((c) => c.formAssociated),
@@ -48,7 +48,7 @@ export const getBuildFeatures = (cmps: ComponentCompilerMeta[]): BuildFeatures =
     propString: cmps.some((c) => c.hasPropString),
     propMutable: cmps.some((c) => c.hasPropMutable),
     reflect: cmps.some((c) => c.hasReflect || c.hasSerializer),
-    scoped: cmps.some((c) => c.encapsulation === 'scoped'),
+    scoped: false,
     serializer: cmps.some((c) => c.hasSerializer),
     shadowDom,
     shadowDelegatesFocus: shadowDom && cmps.some((c) => c.shadowDelegatesFocus),
@@ -176,10 +176,10 @@ export const updateBuildConditionals = (config: ValidatedConfig, b: BuildConditi
   b.scriptDataOpts = config.extras.scriptDataOpts;
   b.attachStyles = true;
   b.invisiblePrehydration = typeof config.invisiblePrehydration === 'undefined' ? true : config.invisiblePrehydration;
-  // TODO(STENCIL-854): Remove code related to legacy shadowDomShim field
-  if (b.shadowDomShim) {
-    b.slotRelocation = b.slot;
-  }
+  // Reduced runtime profile: no scoped-slot relocation or legacy shadow DOM
+  // shim behavior.
+  b.shadowDomShim = false;
+  b.slotRelocation = false;
   if (config.hydratedFlag) {
     b.hydratedAttribute = config.hydratedFlag.selector === 'attribute';
     b.hydratedClass = config.hydratedFlag.selector === 'class';

@@ -1,5 +1,3 @@
-import { BUILD } from '@app-data';
-
 import { parseClassList, setAccessor } from '../set-accessor';
 
 describe('setAccessor for custom elements', () => {
@@ -10,7 +8,7 @@ describe('setAccessor for custom elements', () => {
   });
 
   describe('event listener', () => {
-    it('should allow public method starting with "on" and capital 3rd character', () => {
+    it('should treat public method starting with "on" and capital 3rd character as an event listener', () => {
       const addEventSpy = jest.spyOn(elm, 'addEventListener');
 
       elm.onMyMethod = () => {
@@ -22,7 +20,8 @@ describe('setAccessor for custom elements', () => {
       };
       setAccessor(elm, 'onMyMethod', undefined, fn, false, 0);
 
-      expect(addEventSpy).toHaveBeenCalledTimes(0);
+      expect(addEventSpy).toHaveBeenCalledTimes(1);
+      expect(addEventSpy).toHaveBeenCalledWith('myMethod', fn, false);
     });
 
     it('should remove standardized event listener when has old value, but no new', () => {
@@ -621,10 +620,6 @@ describe('setAccessor for inputs', () => {
 });
 
 describe('setAccessor for standard html elements', () => {
-  beforeEach(() => {
-    BUILD.hydrateClientSide = true;
-  });
-
   describe('simple global attributes', () => {
     it('should not add attribute when prop is undefined or null', () => {
       const inputElm = document.createElement('section');
@@ -817,7 +812,7 @@ describe('setAccessor for standard html elements', () => {
       expect(elm.className).toEqual('');
     });
 
-    it('should add scope classes on initial render if `s-si` set', () => {
+    it('should not auto-add scope classes on initial render', () => {
       const elm = document.createElement('section');
 
       // not s-si set
@@ -827,7 +822,7 @@ describe('setAccessor for standard html elements', () => {
       (elm as any)['s-si'] = 'a-scope-id';
 
       setAccessor(elm, 'class', '', undefined, false, 0, true);
-      expect(elm.className).toEqual('a-scope-id');
+      expect(elm.className).toEqual('');
 
       setAccessor(
         elm,
@@ -838,15 +833,15 @@ describe('setAccessor for standard html elements', () => {
         0,
         true,
       );
-      expect(elm.className).toEqual('a-scope-id a-scope-id-something a-scope-id-something-else');
+      expect(elm.className).toEqual('');
 
       elm.className = '';
       setAccessor(elm, 'class', 'something-old', 'something-new', false, 0, true);
-      expect(elm.className).toEqual('something-new a-scope-id');
+      expect(elm.className).toEqual('something-new');
 
       elm.className = '';
       setAccessor(elm, 'class', 'something-old a-scope-id-something', 'something-new', false, 0, true);
-      expect(elm.className).toEqual('something-new a-scope-id a-scope-id-something');
+      expect(elm.className).toEqual('something-new');
 
       // just check it reverts to normal behavior after initial render
       elm.className = '';

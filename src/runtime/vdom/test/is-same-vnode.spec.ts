@@ -3,22 +3,22 @@ import { h } from '../h';
 import { isSameVnode } from '../vdom-render';
 
 describe('isSameVnode', () => {
-  it('should not be same vnode with slot and no vnode2 name', () => {
+  it('should be same vnode with slot and no vnode2 name', () => {
     const vnode1 = h('slot', { name: 'start' }, '1');
     const vnode2 = h('slot', {}, '2');
-    expect(isSameVnode(vnode1, vnode2)).toBe(false);
+    expect(isSameVnode(vnode1, vnode2)).toBe(true);
   });
 
-  it('should not be same vnode with slot and no vnode1 name', () => {
+  it('should be same vnode with slot and no vnode1 name', () => {
     const vnode1 = h('slot', {}, '1');
     const vnode2 = h('slot', { name: 'end' }, '2');
-    expect(isSameVnode(vnode1, vnode2)).toBe(false);
+    expect(isSameVnode(vnode1, vnode2)).toBe(true);
   });
 
-  it('should not be same vnode with slot and different vname', () => {
+  it('should be same vnode with slot and different vname', () => {
     const vnode1 = h('slot', { name: 'start' }, '1');
     const vnode2 = h('slot', { name: 'end' }, '2');
-    expect(isSameVnode(vnode1, vnode2)).toBe(false);
+    expect(isSameVnode(vnode1, vnode2)).toBe(true);
   });
 
   it('should be same vnode with slot and same vname', () => {

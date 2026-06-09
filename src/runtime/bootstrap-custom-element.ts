@@ -55,9 +55,8 @@ export const proxyCustomElement = (Cstr: any, compactMeta: d.ComponentRuntimeMet
     if (BUILD.reflect) {
       cmpMeta.$attrsToReflect$ = [];
     }
-    if (BUILD.shadowDom && !supportsShadow && cmpMeta.$flags$ & CMP_FLAGS.shadowDomEncapsulation) {
-      // TODO(STENCIL-854): Remove code related to legacy shadowDomShim field
-      cmpMeta.$flags$ |= CMP_FLAGS.needsShadowDomShim;
+    if (BUILD.shadowDom && cmpMeta.$flags$ & CMP_FLAGS.shadowDomEncapsulation && !supportsShadow) {
+      throw new Error(`Shadow DOM support is required for <${cmpMeta.$tagName$}> in this runtime profile.`);
     }
 
     if (!(cmpMeta.$flags$ & CMP_FLAGS.shadowDomEncapsulation) && cmpMeta.$flags$ & CMP_FLAGS.hasSlot) {

@@ -294,7 +294,6 @@ describe('h()', () => {
         $elm$: null,
         $flags$: 0,
         $key$: null,
-        $name$: null,
         $tag$: 'b',
         $text$: null,
       },
@@ -303,18 +302,16 @@ describe('h()', () => {
   });
 
   describe('functional components', () => {
-    it('should receive props, array, and utils as props', async () => {
+    it('should receive props and children as arguments', async () => {
       let args: any;
       const MyFunction: d.FunctionalComponent = (...argArray) => {
         args = argArray;
         return null;
       };
       h(MyFunction, { id: 'blank' }, h('span', {}));
-      expect(args.length).toBe(3);
+      expect(args.length).toBe(2);
       expect(args[0]).toEqual({ id: 'blank' });
       expect(args[1].length).toEqual(1);
-      expect(typeof args[2].map).toBe('function');
-      expect(typeof args[2].forEach).toBe('function');
     });
 
     it('should receive an empty object when component receives no props', async () => {
@@ -358,20 +355,19 @@ describe('h()', () => {
         $attrs$: { id: 'fn-cmp' },
         $children$: [newVNode(null, 'fn-cmp')],
         $key$: null,
-        $name$: null,
         $tag$: 'div',
         $text$: null,
       });
     });
   });
 
-  describe('VDom Util methods', () => {
-    it('utils.forEach should loop over items and get the ChildNode data', () => {
+  describe('functional children operations', () => {
+    it('children.forEach should loop over items and get the VNode data', () => {
       const output: any = [];
-      const FunctionalCmp: d.FunctionalComponent = (_nodeData, children, util) => {
-        util.forEach(children, (element) => {
+      const FunctionalCmp: d.FunctionalComponent = (_nodeData, children) => {
+        children.forEach((element) => {
           output.push(element);
-          util.forEach(element.vchildren, (el) => {
+          element.$children$?.forEach((el) => {
             output.push(el);
           });
         });
@@ -380,44 +376,45 @@ describe('h()', () => {
       h(FunctionalCmp, null, h('div', { id: 'blue' }, h('span', null)));
       expect(output).toEqual([
         {
-          vattrs: {
+          $attrs$: {
             id: 'blue',
           },
-          vchildren: [
+          $children$: [
             {
               $elm$: null,
               $flags$: 0,
               $attrs$: null,
               $children$: null,
               $key$: null,
-              $name$: null,
               $tag$: 'span',
               $text$: null,
             },
           ],
-          vkey: null,
-          vname: null,
-          vtag: 'div',
-          vtext: null,
+          $key$: null,
+          $tag$: 'div',
+          $text$: null,
+          $elm$: null,
+          $flags$: 0,
         },
         {
-          vattrs: null,
-          vchildren: null,
-          vkey: null,
-          vname: null,
-          vtag: 'span',
-          vtext: null,
+          $attrs$: null,
+          $children$: null,
+          $key$: null,
+          $tag$: 'span',
+          $text$: null,
+          $elm$: null,
+          $flags$: 0,
         },
       ]);
     });
 
     it('replaceAttributes should return the attributes for the node', () => {
-      const FunctionalCmp: d.FunctionalComponent = (_nodeData, children, util) => {
-        return util.map(children, (child) => {
+      const FunctionalCmp: d.FunctionalComponent = (_nodeData, children) => {
+        return children.map((child) => {
           return {
             ...child,
-            vattrs: {
-              ...child.vattrs,
+            $attrs$: {
+              ...child.$attrs$,
               class: 'my-class',
             },
           };
@@ -434,7 +431,6 @@ describe('h()', () => {
           },
           $children$: [newVNode(null, 'innerText')],
           $key$: null,
-          $name$: null,
           $tag$: 'div',
           $text$: null,
         },
@@ -446,22 +442,21 @@ describe('h()', () => {
           },
           $children$: null,
           $key$: null,
-          $name$: null,
           $tag$: 'span',
           $text$: null,
         },
       ]);
     });
 
-    it('changing the vtag to a functional component should expand the component', () => {
+    it('changing the $tag$ to a functional component should keep the returned VNode unchanged', () => {
       const ReplacementCmp: d.FunctionalComponent = (nodeData, children) => {
         return h('article', nodeData, h('p', null, ...children));
       };
-      const FunctionalCmp: d.FunctionalComponent = (_nodeData, children, util) => {
-        return util.map(children, (child) => {
+      const FunctionalCmp: d.FunctionalComponent = (_nodeData, children) => {
+        return children.map((child) => {
           return {
             ...child,
-            vtag: child.vtag === 'div' ? ReplacementCmp : child.vtag,
+            $tag$: child.$tag$ === 'div' ? ReplacementCmp : child.$tag$,
           };
         });
       };
@@ -470,24 +465,12 @@ describe('h()', () => {
       expect(vnode).toEqual([
         {
           $flags$: 0,
-          $tag$: 'article',
+          $tag$: ReplacementCmp,
           $text$: null,
           $elm$: null,
-          $children$: [
-            {
-              $flags$: 0,
-              $tag$: 'p',
-              $text$: null,
-              $elm$: null,
-              $children$: [newVNode(null, 'innerText')],
-              $attrs$: null,
-              $key$: null,
-              $name$: null,
-            },
-          ],
+          $children$: [newVNode(null, 'innerText')],
           $attrs$: { id: 'blue' },
           $key$: null,
-          $name$: null,
         },
         {
           $flags$: 0,
@@ -497,7 +480,6 @@ describe('h()', () => {
           $children$: null,
           $attrs$: null,
           $key$: null,
-          $name$: null,
         },
       ]);
     });

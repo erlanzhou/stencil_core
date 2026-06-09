@@ -98,9 +98,8 @@ export const bootstrapLazy = (lazyBundles: d.LazyBundlesRuntimeData, options: d.
         cmpMeta.$serializers$ = compactMeta[5] ?? {};
         cmpMeta.$deserializers$ = compactMeta[6] ?? {};
       }
-      if (BUILD.shadowDom && !supportsShadow && cmpMeta.$flags$ & CMP_FLAGS.shadowDomEncapsulation) {
-        // TODO(STENCIL-854): Remove code related to legacy shadowDomShim field
-        cmpMeta.$flags$ |= CMP_FLAGS.needsShadowDomShim;
+      if (BUILD.shadowDom && cmpMeta.$flags$ & CMP_FLAGS.shadowDomEncapsulation && !supportsShadow) {
+        throw new Error(`Shadow DOM support is required for <${cmpMeta.$tagName$}> in this runtime profile.`);
       }
       // TODO: deprecated in favour of `setTagTransformer` and `transformTag`. Remove `BUILD.transformTagName` & `transformTagName` in 5.0
       const tagName =

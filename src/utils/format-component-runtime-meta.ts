@@ -35,12 +35,8 @@ export const formatComponentRuntimeMeta = (
   if (compilerMeta.formAssociated) {
     flags |= CMP_FLAGS.formAssociated;
   }
-  if (compilerMeta.encapsulation !== 'shadow' && compilerMeta.htmlTagNames.includes('slot')) {
-    flags |= CMP_FLAGS.hasSlotRelocation;
-  }
-  if (compilerMeta.hasSlot) {
-    flags |= CMP_FLAGS.hasSlot;
-  }
+  // Reduced runtime profile: we only support native shadow-slot behavior and
+  // do not emit pseudo-slot relocation flags for non-shadow components.
   if (compilerMeta.hasMode) {
     flags |= CMP_FLAGS.hasMode;
   }

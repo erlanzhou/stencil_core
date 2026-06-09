@@ -1,7 +1,7 @@
 import type * as d from '../../../declarations';
 import { NODE_TYPE } from '../../runtime-constants';
 import { newVNode } from '../h';
-import * as setAccessor from '../set-accessor';
+import * as setAccessor from '../../../render-kernel/vdom/set-accessor';
 import { updateElement } from '../update-element';
 
 describe('updateElement', () => {

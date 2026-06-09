@@ -1,18 +1,24 @@
 import { normalizePath } from '@utils';
 import type { Plugin } from 'rollup';
 
-import type * as d from '../../../declarations';
+import type * as d from '../../declarations';
 
+/**
+ * Rollup plugin used to materialize component entry modules from component
+ * metadata. Previously lived under the lazy output-target implementation, but
+ * it's shared bundling infrastructure and still required by the reduced
+ * runtime profile.
+ */
 export const lazyComponentPlugin = (buildCtx: d.BuildCtx): Plugin => {
-  const entrys = new Map<string, d.EntryModule>();
+  const entries = new Map<string, d.EntryModule>();
 
-  const plugin: Plugin = {
+  return {
     name: 'lazyComponentPlugin',
 
     resolveId(importee) {
       const entryModule = buildCtx.entryModules.find((entryModule) => entryModule.entryKey === importee);
       if (entryModule) {
-        entrys.set(importee, entryModule);
+        entries.set(importee, entryModule);
         return importee;
       }
 
@@ -20,15 +26,13 @@ export const lazyComponentPlugin = (buildCtx: d.BuildCtx): Plugin => {
     },
 
     load(id) {
-      const entryModule = entrys.get(id);
+      const entryModule = entries.get(id);
       if (entryModule) {
         return entryModule.cmps.map(createComponentExport).join('\n');
       }
       return null;
     },
   };
-
-  return plugin;
 };
 
 const createComponentExport = (cmp: d.ComponentCompilerMeta): string => {
@@ -37,3 +41,4 @@ const createComponentExport = (cmp: d.ComponentCompilerMeta): string => {
   const filePath = normalizePath(cmp.sourceFilePath);
   return `export { ${originalClassName} as ${underscoredClassName} } from '${filePath}';`;
 };
+

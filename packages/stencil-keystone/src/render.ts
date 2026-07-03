@@ -19,7 +19,7 @@ const hostRefCache = new WeakMap<Element, RenderHostRef>();
  *
  * @example
  * ```tsx
- * import { render } from '@stencil/render-kernel';
+ * import { render } from 'stencil-keystone';
  *
  * const vnode = (
  *   <div>

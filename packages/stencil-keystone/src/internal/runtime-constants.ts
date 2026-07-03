@@ -1,7 +1,7 @@
 /**
  * A (subset) of node types relevant to render-kernel.
  */
-export const enum NODE_TYPE {
+export enum NODE_TYPE {
   ElementNode = 1,
   TextNode = 3,
   CommentNode = 8,

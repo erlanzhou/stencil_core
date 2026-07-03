@@ -1,7 +1,7 @@
 {
-  "name": "@stencil/render-kernel",
+  "name": "stencil-keystone",
   "version": "0.0.0-dev",
-  "description": "Standalone render kernel for Stencil VDOM runtime",
+  "description": "Standalone client-side VDOM render kernel and web-component element runtime",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -16,6 +16,8 @@
     "build": "node ./scripts/build.mjs",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepack": "npm run build"
   },
   "exports": {
@@ -24,5 +26,9 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     }
+  },
+  "devDependencies": {
+    "happy-dom": "^20.10.6",
+    "vitest": "^4.1.9"
   }
 }

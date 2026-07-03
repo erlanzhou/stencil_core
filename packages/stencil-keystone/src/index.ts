@@ -1,3 +1,4 @@
+export * from './element';
 export type { RenderHostRef } from './internal/host-ref';
 export type {
   ChildType,

@@ -1,7 +1,9 @@
-import { build } from 'esbuild';
-import { cpSync, mkdirSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, rmSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { build } from 'esbuild';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = resolve(__dirname, '..');
@@ -37,6 +39,8 @@ await build({
   outfile: resolve(outDir, 'index.cjs'),
 });
 
-cpSync(resolve(pkgRoot, 'index.d.ts'), resolve(outDir, 'index.d.ts'));
+// Emit .d.ts for the whole source tree from a real tsc pass (no hand-maintained
+// declaration file to drift out of sync).
+execFileSync('npx', ['tsc', '-p', 'tsconfig.build.json'], { cwd: pkgRoot, stdio: 'inherit' });
 
-console.log('✅ built @stencil/render-kernel -> dist');
+console.log('✅ built stencil-keystone -> dist');

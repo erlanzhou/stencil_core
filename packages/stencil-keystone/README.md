@@ -1,4 +1,4 @@
-# @stencil/render-kernel
+# stencil-keystone
 
 A standalone client-side VDOM render kernel, originally extracted from Stencil's
 runtime internals and now **fully independent of `@stencil/core`** — it owns its
@@ -19,17 +19,17 @@ a (shadow) DOM. Framework wrappers (React, Vue2) sit above it.
 ## Public entrypoint
 
 ```ts
-import { h, render } from '@stencil/render-kernel';
+import { h, render } from 'stencil-keystone';
 ```
 
 ## Build
 
 ```bash
-cd packages/render-kernel
+cd packages/stencil-keystone
 npm run build
 ```
 
-Build output is written to `packages/render-kernel/dist`.
+Build output is written to `packages/stencil-keystone/dist`.
 
 ## VNode shape
 

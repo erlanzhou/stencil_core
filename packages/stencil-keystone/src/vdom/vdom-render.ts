@@ -583,7 +583,7 @@ export const insertBefore = (
  * @param renderFnResults the virtual DOM nodes to be rendered
  * @param isInitialLoad whether or not this is the first call after page load
  */
-export const renderVdom = (hostRef: RenderHostRef, renderFnResults: VNode | VNode[], isInitialLoad = false) => {
+export const renderVdom = (hostRef: RenderHostRef, renderFnResults: VNode | VNode[] | null, isInitialLoad = false) => {
   const hostElm = hostRef.$hostElement$;
   const oldVNode: VNode = hostRef.$vnode$ || newVNode(null, null);
   const isHostElement = isHost(renderFnResults);

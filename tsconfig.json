@@ -26,8 +26,6 @@
       "@dev-server-process": ["src/dev-server/server-process.ts"],
       "@hydrate-factory": ["src/hydrate/runner/hydrate-factory.ts"],
       "@platform": ["src/client/index.ts"],
-      "@render-kernel": ["packages/render-kernel/src/index.ts"],
-      "@render-kernel/*": ["packages/render-kernel/src/*"],
       "@runtime": ["src/runtime/index.ts"],
       "@stencil/core/compiler": ["src/compiler/index.ts"],
       "@stencil/core/declarations": ["src/declarations/index.ts"],

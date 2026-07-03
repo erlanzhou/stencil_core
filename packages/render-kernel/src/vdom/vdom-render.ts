@@ -6,12 +6,10 @@
  *
  * Modified for Stencil's renderer and slot projection
  */
-import { BUILD } from '@app-data';
-import { consoleDevError, win } from '@platform';
-import { HTML_NS, SVG_NS } from '../../utils/constants';
-
-import type * as d from '../../declarations';
-import { VNODE_FLAGS } from '../../runtime/runtime-constants';
+import { HTML_NS, SVG_NS } from '../internal/constants';
+import type { RenderHostRef } from '../internal/host-ref';
+import { consoleDevError, win } from '../internal/platform';
+import type { PatchedSlotNode, RenderNode, VNode } from '../internal/types';
 import { h, isHost, newVNode } from './h';
 import { updateElement } from './update-element';
 
@@ -25,8 +23,8 @@ let isSvgMode = false;
  * These ensure that ref callbacks are called in the correct order:
  * first all removal callbacks (with null), then all attachment callbacks (with elements).
  */
-let refCallbacksToRemove: Array<() => void> = [];
-let refCallbacksToAttach: Array<() => void> = [];
+const refCallbacksToRemove: Array<() => void> = [];
+const refCallbacksToAttach: Array<() => void> = [];
 
 /**
  * Create a DOM Node corresponding to one of the children of a given VNode.
@@ -37,11 +35,11 @@ let refCallbacksToAttach: Array<() => void> = [];
  * children, for which we will create a new DOM node
  * @returns the newly created node
  */
-const createElm = (oldParentVNode: d.VNode, newParentVNode: d.VNode, childIndex: number) => {
-  const newVNode = newParentVNode.$children$[childIndex];
+const createElm = (oldParentVNode: VNode | null, newParentVNode: VNode, childIndex: number) => {
+  const newVNode = newParentVNode.$children$![childIndex];
   let i = 0;
-  let elm: d.RenderNode;
-  let childNode: d.RenderNode;
+  let elm: RenderNode;
+  let childNode: RenderNode;
 
   if (IS_DEV && newVNode.$elm$) {
     consoleDevError(
@@ -104,7 +102,7 @@ const createElm = (oldParentVNode: d.VNode, newParentVNode: d.VNode, childIndex:
 };
 
 /**
- * Create DOM nodes corresponding to a list of {@link d.Vnode} objects and
+ * Create DOM nodes corresponding to a list of {@link VNode} objects and
  * add them to the DOM in the appropriate place.
  *
  * @param parentElm the DOM node which should be used as a parent for the new
@@ -119,10 +117,10 @@ const createElm = (oldParentVNode: d.VNode, newParentVNode: d.VNode, childIndex:
  * creating DOM nodes (inclusive)
  */
 const addVnodes = (
-  parentElm: d.RenderNode,
-  before: d.RenderNode,
-  parentVNode: d.VNode,
-  vnodes: d.VNode[],
+  parentElm: RenderNode,
+  before: RenderNode | null,
+  parentVNode: VNode,
+  vnodes: VNode[],
   startIdx: number,
   endIdx: number,
 ) => {
@@ -142,14 +140,14 @@ const addVnodes = (
       childNode = createElm(null, parentVNode, startIdx);
       if (childNode) {
         vnodes[startIdx].$elm$ = childNode as any;
-        insertBefore(containerElm, childNode as d.RenderNode, before);
+        insertBefore(containerElm, childNode as RenderNode, before);
       }
     }
   }
 };
 
 /**
- * Remove the DOM elements corresponding to a list of {@link d.VNode} objects.
+ * Remove the DOM elements corresponding to a list of {@link VNode} objects.
  * This can be used to, for instance, clean up after a list of children which
  * should no longer be shown.
  *
@@ -159,7 +157,7 @@ const addVnodes = (
  * @param startIdx the index at which to start removing nodes (inclusive)
  * @param endIdx the index at which to stop removing nodes (inclusive)
  */
-const removeVnodes = (vnodes: d.VNode[], startIdx: number, endIdx: number) => {
+const removeVnodes = (vnodes: VNode[], startIdx: number, endIdx: number) => {
   for (let index = startIdx; index <= endIdx; ++index) {
     const vnode = vnodes[index];
     if (vnode) {
@@ -240,10 +238,10 @@ const removeVnodes = (vnodes: d.VNode[], startIdx: number, endIdx: number) => {
  * @param isInitialRender whether or not this is the first render of the vdom
  */
 const updateChildren = (
-  parentElm: d.RenderNode,
-  oldCh: d.VNode[],
-  newVNode: d.VNode,
-  newCh: d.VNode[],
+  parentElm: RenderNode,
+  oldCh: VNode[],
+  newVNode: VNode,
+  newCh: VNode[],
   isInitialRender = false,
 ) => {
   let oldStartIdx = 0;
@@ -257,7 +255,7 @@ const updateChildren = (
   let newStartVnode = newCh[0];
   let newEndVnode = newCh[newEndIdx];
   let node: Node;
-  let elmToMove: d.VNode;
+  let elmToMove: VNode;
 
   // For template elements, we need to work with the content DocumentFragment
   const containerElm = newVNode.$tag$ === 'template' ? (parentElm as HTMLTemplateElement).content : parentElm;
@@ -377,7 +375,7 @@ const updateChildren = (
           patch(elmToMove, newStartVnode, isInitialRender);
           // invalidate the matching old node so that we won't try to update it
           // again later on
-          oldCh[idxInOld] = undefined;
+          oldCh[idxInOld] = undefined as unknown as VNode;
           node = elmToMove.$elm$;
         }
 
@@ -392,7 +390,7 @@ const updateChildren = (
       }
 
       if (node) {
-        insertBefore(oldStartVnode.$elm$.parentNode, node as d.RenderNode, oldStartVnode.$elm$);
+        insertBefore(oldStartVnode.$elm$.parentNode, node as RenderNode, oldStartVnode.$elm$);
       }
     }
   }
@@ -430,7 +428,7 @@ const updateChildren = (
  * @param isInitialRender whether or not this is the first render of the vdom
  * @returns whether they're equal or not
  */
-export const isSameVnode = (leftVNode: d.VNode, rightVNode: d.VNode, isInitialRender = false) => {
+export const isSameVnode = (leftVNode: VNode, rightVNode: VNode, isInitialRender = false) => {
   // compare if two vnode to see if they're "technically" the same
   // need to have the same element tag, and same key to be the same
   if (leftVNode.$tag$ === rightVNode.$tag$) {
@@ -461,7 +459,7 @@ export const isSameVnode = (leftVNode: d.VNode, rightVNode: d.VNode, isInitialRe
  * @param newVNode a new VNode representing an updated version of the old one
  * @param isInitialRender whether or not this is the first render of the vdom
  */
-export const patch = (oldVNode: d.VNode, newVNode: d.VNode, isInitialRender = false) => {
+export const patch = (oldVNode: VNode, newVNode: VNode, isInitialRender = false) => {
   const elm = (newVNode.$elm$ = oldVNode.$elm$);
   const oldChildren = oldVNode.$children$;
   const newChildren = newVNode.$children$;
@@ -517,7 +515,7 @@ export const patch = (oldVNode: d.VNode, newVNode: d.VNode, isInitialRender = fa
  *
  * @param vNode a virtual DOM node
  */
-export const nullifyVNodeRefs = (vNode: d.VNode) => {
+export const nullifyVNodeRefs = (vNode: VNode) => {
   if (vNode.$attrs$ && vNode.$attrs$.ref) {
     refCallbacksToRemove.push(() => vNode.$attrs$.ref(null));
   }
@@ -562,33 +560,32 @@ const flushQueuedRefCallbacks = () => {
  */
 export const insertBefore = (
   parent: Node,
-  newNode: d.RenderNode,
-  reference?: d.RenderNode | d.PatchedSlotNode,
+  newNode: RenderNode,
+  reference?: RenderNode | PatchedSlotNode | null,
 ): Node => {
-  if ((parent as d.RenderNode).__insertBefore) {
-    return (parent as d.RenderNode).__insertBefore(newNode, reference) as d.RenderNode;
+  if ((parent as RenderNode).__insertBefore) {
+    return (parent as RenderNode).__insertBefore!(newNode, reference) as RenderNode;
   } else {
-    return parent?.insertBefore(newNode, reference) as d.RenderNode;
+    return parent?.insertBefore(newNode, reference ?? null) as RenderNode;
   }
 };
 
 /**
  * The main entry point for Stencil's virtual DOM-based rendering engine
  *
- * Given a {@link d.HostRef} container and some virtual DOM nodes, this
+ * Given a {@link RenderHostRef} container and some virtual DOM nodes, this
  * function will handle creating a virtual DOM tree with a single root, patching
- * the current virtual DOM tree onto an old one (if any), dealing with slot
- * relocation, and reflecting attributes.
+ * the current virtual DOM tree onto an old one (if any), and dealing with slot
+ * relocation.
  *
  * @param hostRef data needed to root and render the virtual DOM tree, such as
  * the DOM node into which it should be rendered.
  * @param renderFnResults the virtual DOM nodes to be rendered
  * @param isInitialLoad whether or not this is the first call after page load
  */
-export const renderVdom = (hostRef: d.HostRef, renderFnResults: d.VNode | d.VNode[], isInitialLoad = false) => {
+export const renderVdom = (hostRef: RenderHostRef, renderFnResults: VNode | VNode[], isInitialLoad = false) => {
   const hostElm = hostRef.$hostElement$;
-  const cmpMeta = hostRef.$cmpMeta$;
-  const oldVNode: d.VNode = hostRef.$vnode$ || newVNode(null, null);
+  const oldVNode: VNode = hostRef.$vnode$ || newVNode(null, null);
   const isHostElement = isHost(renderFnResults);
 
   // if `renderFnResults` is a Host node then we can use it directly. If not,
@@ -596,7 +593,7 @@ export const renderVdom = (hostRef: d.HostRef, renderFnResults: d.VNode | d.VNod
   // 'dummy' Host node (well, an empty vnode) since `renderVdom` assumes
   // implicitly that the top-level vdom node is 1) an only child and 2)
   // contains attrs that need to be set on the host element.
-  const rootVnode = isHostElement ? renderFnResults : h(null, null, renderFnResults as any);
+  const rootVnode: VNode = isHostElement ? (renderFnResults as VNode) : h(null, null, renderFnResults as any);
 
   hostTagName = hostElm.tagName;
 
@@ -616,17 +613,6 @@ render() {
   `);
   }
 
-  if (BUILD.reflect && cmpMeta.$attrsToReflect$) {
-    rootVnode.$attrs$ = rootVnode.$attrs$ || {};
-    cmpMeta.$attrsToReflect$.forEach(([propName, attribute]) => {
-      if (BUILD.serializer && hostRef.$serializerValues$.has(propName)) {
-        rootVnode.$attrs$[attribute] = hostRef.$serializerValues$.get(propName);
-      } else {
-        rootVnode.$attrs$[attribute] = (hostElm as any)[propName];
-      }
-    });
-  }
-
   // On the first render and *only* on the first render we want to check for
   // any attributes set on the host element which are also set on the vdom
   // node. If we find them, we override the value on the VDom node attrs with
@@ -644,13 +630,13 @@ render() {
       // Likewise, `ref` and `key` are special internal values for the Stencil
       // runtime and we don't want to override those either.
       if (hostElm.hasAttribute(key) && !['key', 'ref', 'style', 'class'].includes(key)) {
-        rootVnode.$attrs$[key] = hostElm[key as keyof d.HostElement];
+        rootVnode.$attrs$[key] = (hostElm as any)[key];
       }
     }
   }
 
   rootVnode.$tag$ = null;
-  rootVnode.$flags$ |= VNODE_FLAGS.isHost;
+  rootVnode.$isHost$ = true;
   hostRef.$vnode$ = rootVnode;
   rootVnode.$elm$ = oldVNode.$elm$ = (hostElm.shadowRoot || hostElm) as any;
 

@@ -11,7 +11,7 @@
 
 import { h } from './h';
 
-export { Fragment } from '../../runtime/fragment';
+export { Fragment } from '../internal/fragment';
 
 /**
  * JSX runtime function for creating elements in production mode.
@@ -22,7 +22,7 @@ export { Fragment } from '../../runtime/fragment';
  * @param key - Optional key for the element
  * @returns A virtual DOM node
  */
-export function jsx(type: any, props: any, key?: string) {
+export function jsx(type: any, props: any, key?: string | number) {
   const propsObj = props || {};
   const { children, ...rest } = propsObj;
   // Build vnodeData - key from props takes precedence over parameter
@@ -37,17 +37,8 @@ export function jsx(type: any, props: any, key?: string) {
   }
 
   if (children !== undefined) {
-    // If children is already an array, spread it
-    if (Array.isArray(children)) {
-      return h(type, vnodeData, ...children);
-    }
-    // If single child is a VNode (has $flags$), pass it directly
-    // Otherwise it gets stringified
-    if (typeof children === 'object' && children !== null && '$flags$' in children) {
-      return h(type, vnodeData, children);
-    }
-    // For primitive values (strings, numbers), pass directly
-    return h(type, vnodeData, children);
+    // A static array of children is spread; anything else is passed as a single child
+    return Array.isArray(children) ? h(type, vnodeData, ...children) : h(type, vnodeData, children);
   }
 
   return h(type, vnodeData);
@@ -62,6 +53,6 @@ export function jsx(type: any, props: any, key?: string) {
  * @param key - Optional key for the element
  * @returns A virtual DOM node
  */
-export function jsxs(type: any, props: any, key?: string) {
+export function jsxs(type: any, props: any, key?: string | number) {
   return jsx(type, props, key);
 }

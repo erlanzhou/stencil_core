@@ -1,4 +1,5 @@
-import type * as d from '../declarations';
+import type { RenderHostRef } from './internal/host-ref';
+import type { HostElement, VNode } from './internal/types';
 import { renderVdom } from './vdom/vdom-render';
 
 /**
@@ -7,7 +8,7 @@ import { renderVdom } from './vdom/vdom-render';
  * call creates a fresh HostRef with no previous VNode, causing renderVdom to
  * replace the entire DOM subtree instead of patching only what changed.
  */
-const hostRefCache = new WeakMap<Element, d.HostRef>();
+const hostRefCache = new WeakMap<Element, RenderHostRef>();
 
 /**
  * Method to render a virtual DOM tree to a container element.
@@ -18,7 +19,7 @@ const hostRefCache = new WeakMap<Element, d.HostRef>();
  *
  * @example
  * ```tsx
- * import { render } from '@stencil/core';
+ * import { render } from '@stencil/render-kernel';
  *
  * const vnode = (
  *   <div>
@@ -31,21 +32,11 @@ const hostRefCache = new WeakMap<Element, d.HostRef>();
  * @param vnode - The virtual DOM tree to render
  * @param container - The container element to render the virtual DOM tree to
  */
-export function render(vnode: d.VNode, container: Element) {
+export function render(vnode: VNode, container: Element) {
   let ref = hostRefCache.get(container);
 
   if (!ref) {
-    const cmpMeta: d.ComponentRuntimeMeta = {
-      $flags$: 0,
-      $tagName$: container.tagName,
-    };
-
-    ref = {
-      $flags$: 0,
-      $cmpMeta$: cmpMeta,
-      $hostElement$: container as d.HostElement,
-    };
-
+    ref = { $hostElement$: container as HostElement };
     hostRefCache.set(container, ref);
   }
 

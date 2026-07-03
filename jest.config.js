@@ -3,9 +3,9 @@ module.exports = {
     '@app-data': '<rootDir>/internal/app-data/index.cjs',
     '@app-globals': '<rootDir>/internal/app-globals/index.cjs',
     '@platform': '<rootDir>/internal/testing/index.js',
-    '@render-kernel': '<rootDir>/src/render-kernel/index.ts',
-    '^@render-kernel/(.*)$': '<rootDir>/src/render-kernel/$1',
-    '@runtime': '<rootDir>/internal/testing/index.js',
+    '^@render-kernel$': '<rootDir>/packages/render-kernel/src/index.ts',
+    '^@render-kernel/(.*)$': '<rootDir>/packages/render-kernel/src/$1',
+    '^@runtime$': '<rootDir>/internal/testing/index.js',
     '@stencil/core/cli': '<rootDir>/cli/index.cjs',
     '@stencil/core/compiler': '<rootDir>/compiler/stencil.js',
     '@stencil/core/mock-doc': '<rootDir>/mock-doc/index.cjs',
@@ -60,7 +60,7 @@ module.exports = {
     '<rootDir>/test/',
     '<rootDir>/testing/',
   ],
-  testRegex: '/(src|scripts)/.*\\.spec\\.(ts|tsx|js)$',
+  testRegex: '/(src|scripts|packages)/.*\\.spec\\.(ts|tsx|js)$',
   // TODO(STENCIL-307): Move away from Jasmine runner for internal Stencil tests as a part of the (internal) Jest 28+ upgrade
   testRunner: 'jest-jasmine2',
   transform: {

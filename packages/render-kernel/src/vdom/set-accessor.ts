@@ -7,12 +7,10 @@
  * Modified for Stencil's compiler and vdom
  */
 
-import { BUILD } from '@app-data';
-import { getHostRef, isMemberInElement, plt, win } from '@platform';
-import { isComplexType } from '../../utils/helpers';
-
-import type * as d from '../../declarations';
-import { NODE_TYPE, VNODE_FLAGS, XLINK_NS } from '../../runtime/runtime-constants';
+import { isComplexType } from '../internal/helpers';
+import { isMemberInElement, win } from '../internal/platform';
+import { NODE_TYPE, XLINK_NS } from '../internal/runtime-constants';
+import type { RenderNode } from '../internal/types';
 import { queueRefAttachment } from './vdom-render';
 
 /**
@@ -28,18 +26,22 @@ import { queueRefAttachment } from './vdom-render';
  * @param oldValue the old value for the attribute
  * @param newValue the new value for the attribute
  * @param isSvg whether we're in an svg context or not
- * @param flags bitflags for Vdom variables
- * @param initialRender whether this is the first render of the VDom
+ * @param isHost whether the target element is the render root (the `<Host>`),
+ * in which case attributes are reflected onto the element even when they also
+ * exist as DOM properties
+ * @param isInitialRender whether this is the first render pass
  */
 export const setAccessor = (
-  elm: d.RenderNode,
+  elm: RenderNode,
   memberName: string,
   oldValue: any,
   newValue: any,
   isSvg: boolean,
-  flags: number,
-  _initialRender?: boolean,
+  isHost: boolean,
+  isInitialRender?: boolean,
 ) => {
+  void isInitialRender;
+
   if (oldValue === newValue) {
     return;
   }
@@ -122,52 +124,13 @@ export const setAccessor = (
       memberName = memberName.replace(CAPTURE_EVENT_REGEX, '');
 
       if (oldValue) {
-        plt.rel(elm, memberName, oldValue, capture);
+        elm.removeEventListener(memberName, oldValue, capture);
       }
       if (newValue) {
-        plt.ael(elm, memberName, newValue, capture);
+        elm.addEventListener(memberName, newValue, capture);
       }
     }
-  } else if (BUILD.vdomPropOrAttr && memberName[0] === 'a' && memberName.startsWith('attr:')) {
-    // Explicit attr: prefix — always set as attribute, bypass heuristic
-    const propName = memberName.slice(5);
-    // Look up the actual attribute name from component metadata
-    // Component metadata stores [flags, attributeName] for each member
-    let attrName: string | undefined;
-    if (BUILD.member) {
-      const hostRef = getHostRef(elm);
-      if (hostRef && hostRef.$cmpMeta$ && hostRef.$cmpMeta$.$members$) {
-        const memberMeta = hostRef.$cmpMeta$.$members$[propName];
-        if (memberMeta && memberMeta[1]) {
-          attrName = memberMeta[1];
-        }
-      }
-    }
-    // Fallback: convert camelCase to kebab-case if no metadata found
-    if (!attrName) {
-      attrName = propName.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
-    }
-    if (newValue == null || newValue === false) {
-      // null or undefined or false (and no value) - remove attribute
-      if (newValue !== false || elm.getAttribute(attrName) === '') {
-        elm.removeAttribute(attrName);
-      }
-    } else {
-      elm.setAttribute(attrName, newValue === true ? '' : newValue);
-    }
-    return;
-  } else if (BUILD.vdomPropOrAttr && memberName[0] === 'p' && memberName.startsWith('prop:')) {
-    // Explicit prop: prefix — always set as property, bypass heuristic
-    const propName = memberName.slice(5);
-    try {
-      (elm as any)[propName] = newValue;
-    } catch (e) {
-      /**
-       * in case someone tries to set a read-only property, we just ignore it
-       */
-    }
-    return;
-  } else if (BUILD.vdomPropOrAttr) {
+  } else {
     // Set property if it exists and it's not a SVG
     const isComplex = isComplexType(newValue);
     if ((isProp || (isComplex && newValue !== null)) && !isSvg) {
@@ -216,7 +179,7 @@ export const setAccessor = (
         }
       }
     } else if (
-      (!isProp || flags & VNODE_FLAGS.isHost || isSvg) &&
+      (!isProp || isHost || isSvg) &&
       !isComplex &&
       elm.nodeType === NODE_TYPE.ElementNode
     ) {

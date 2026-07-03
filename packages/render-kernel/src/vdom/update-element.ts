@@ -1,5 +1,5 @@
-import type * as d from '../../declarations';
-import { NODE_TYPE } from '../../runtime/runtime-constants';
+import { NODE_TYPE } from '../internal/runtime-constants';
+import type { VNode } from '../internal/types';
 import { setAccessor } from './set-accessor';
 
 /**
@@ -15,8 +15,8 @@ import { setAccessor } from './set-accessor';
  * @param isInitialRender whether this is the first render of the VDOM
  */
 export const updateElement = (
-  oldVnode: d.VNode | null,
-  newVnode: d.VNode,
+  oldVnode: VNode | null,
+  newVnode: VNode,
   isSvgMode: boolean,
   isInitialRender?: boolean,
 ): void => {
@@ -39,7 +39,7 @@ export const updateElement = (
         oldVnodeAttrs[memberName],
         undefined,
         isSvgMode,
-        newVnode.$flags$,
+        newVnode.$isHost$,
         isInitialRender,
       );
     }
@@ -53,7 +53,7 @@ export const updateElement = (
       oldVnodeAttrs[memberName],
       newVnodeAttrs[memberName],
       isSvgMode,
-      newVnode.$flags$,
+      newVnode.$isHost$,
       isInitialRender,
     );
   }

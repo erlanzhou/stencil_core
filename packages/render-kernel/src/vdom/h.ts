@@ -7,25 +7,20 @@
  * Modified for Stencil's compiler and vdom
  */
 
-import { BUILD } from '@app-data';
-import { consoleDevError, consoleDevWarn, transformTag } from '@platform';
-import { isComplexType } from '../../utils/helpers';
-
-import type * as d from '../../declarations';
+import { isComplexType } from '../internal/helpers';
+import { consoleDevError, consoleDevWarn } from '../internal/platform';
+import type { ChildType, FunctionalComponent, VNode } from '../internal/types';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
 
-// export function h(nodeName: string | d.FunctionalComponent, vnodeData: d.PropsType, child?: d.ChildType): d.VNode;
-// export function h(nodeName: string | d.FunctionalComponent, vnodeData: d.PropsType, ...children: d.ChildType[]): d.VNode;
-export const h = (nodeName: any, vnodeData: any, ...children: d.ChildType[]): d.VNode => {
-  if (typeof nodeName === 'string') {
-    nodeName = transformTag(nodeName);
-  }
-  let child = null;
-  let key: string = null;
+// export function h(nodeName: string | FunctionalComponent, vnodeData: PropsType, child?: ChildType): VNode;
+// export function h(nodeName: string | FunctionalComponent, vnodeData: PropsType, ...children: ChildType[]): VNode;
+export const h = (nodeName: any, vnodeData: any, ...children: ChildType[]): VNode => {
+  let child: any = null;
+  let key: string | null = null;
   let simple = false;
   let lastSimple = false;
-  const vNodeChildren: d.VNode[] = [];
+  const vNodeChildren: VNode[] = [];
   const walk = (c: any[]) => {
     for (let i = 0; i < c.length; i++) {
       child = c[i];
@@ -34,7 +29,7 @@ export const h = (nodeName: any, vnodeData: any, ...children: d.ChildType[]): d.
       } else if (child != null && typeof child !== 'boolean') {
         if ((simple = typeof nodeName !== 'function' && !isComplexType(child))) {
           child = String(child);
-        } else if (IS_DEV && typeof nodeName !== 'function' && child.$flags$ === undefined) {
+        } else if (IS_DEV && typeof nodeName !== 'function' && child.$isHost$ === undefined) {
           consoleDevError(`vNode passed as children has unexpected type.
 Make sure it's using the correct h() function.
 Empty objects can also be the cause, look for JSX comments that became objects.`);
@@ -77,9 +72,9 @@ Empty objects can also be the cause, look for JSX comments that became objects.`
 - <Host> is used once, and it's the single root component of the render() function.`);
   }
 
-  if (BUILD.vdomFunctional && typeof nodeName === 'function') {
+  if (typeof nodeName === 'function') {
     // nodeName is a functional component
-    return (nodeName as d.FunctionalComponent<any>)(vnodeData === null ? {} : vnodeData, vNodeChildren) as any;
+    return (nodeName as FunctionalComponent<any>)(vnodeData === null ? {} : vnodeData, vNodeChildren) as any;
   }
 
   const vnode = newVNode(nodeName, null);
@@ -99,9 +94,9 @@ Empty objects can also be the cause, look for JSX comments that became objects.`
  * @param text possible text content for the node
  * @returns a newly-minted virtual DOM node
  */
-export const newVNode = (tag: string, text: string) => {
-  const vnode: d.VNode = {
-    $flags$: 0,
+export const newVNode = (tag: string | null, text: string | null) => {
+  const vnode: VNode = {
+    $isHost$: false,
     $tag$: tag,
     // Normalize undefined to null to prevent rendering "undefined" as text
     $text$: text ?? null,
@@ -121,7 +116,7 @@ export const Host = {};
  * @param node the virtual DOM node to check
  * @returns whether it's a Host node or not
  */
-export const isHost = (node: any): node is d.VNode => node && node.$tag$ === Host;
+export const isHost = (node: any): node is VNode => node && node.$tag$ === Host;
 
 /**
  * Validates the ordering of attributes on an input element

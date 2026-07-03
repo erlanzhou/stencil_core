@@ -17,8 +17,7 @@ export const getValue = (ref: HostElement, propName: string): unknown =>
 /**
  * Write a reactive member's value. If it actually changed: fire any `@Watch`
  * callbacks (once the component is past initialization), then schedule a
- * re-render — unless `componentShouldUpdate` vetoes it — provided the element has
- * already rendered once.
+ * re-render, provided the element has already rendered once.
  *
  * @param ref the host element
  * @param propName the member name
@@ -31,10 +30,11 @@ export const setValue = (
   newVal: unknown,
   cmpMeta: ComponentRuntimeMeta,
 ): void => {
-  const hostRef = getHostRef(ref);
-  if (!hostRef) {
-    return;
-  }
+  // The host reference is registered at construction (compiler-injected
+  // `baseConstructor(this)`), so values set before the element connects — a
+  // constructor seeding initial `@State`/`@Prop` values, or a wrapper's
+  // `el.prop = x` before mount — already have a host reference to write into.
+  const hostRef = getHostRef(ref)!;
   const instanceValues = hostRef.$instanceValues$;
   const oldVal = instanceValues.get(propName);
   if (instanceValues.has(propName) && Object.is(newVal, oldVal)) {
@@ -45,8 +45,8 @@ export const setValue = (
   const instance = ref as unknown as Record<string, unknown>;
 
   // @Watch callbacks — only once the component is past initialization
-  if (cmpMeta.$watchers$ && hostRef.$flags$ & HOST_FLAGS.isWatchReady) {
-    const watchMethods = cmpMeta.$watchers$[propName];
+  if (cmpMeta.$watched$ && hostRef.$flags$ & HOST_FLAGS.isWatchReady) {
+    const watchMethods = cmpMeta.$watched$[propName];
     if (watchMethods) {
       for (const methodName of watchMethods) {
         const method = instance[methodName];
@@ -61,15 +61,11 @@ export const setValue = (
     }
   }
 
+  // Schedule a re-render once the component has rendered. Before the first render
+  // (seeding values in the constructor or componentWillLoad) the pending initial
+  // render already reflects the change, so nothing is scheduled here; scheduleUpdate
+  // itself dedups concurrent changes within a tick.
   if (hostRef.$flags$ & HOST_FLAGS.hasRendered) {
-    const shouldUpdate = instance.componentShouldUpdate;
-    if (
-      typeof shouldUpdate === 'function' &&
-      shouldUpdate.call(instance, newVal, oldVal, propName) === false &&
-      !(hostRef.$flags$ & HOST_FLAGS.isQueuedForUpdate)
-    ) {
-      return;
-    }
     scheduleUpdate(hostRef);
   }
 };

@@ -1,7 +1,7 @@
 import type { HostElement } from '../internal/types';
-import { getHostRef, HOST_FLAGS, registerHost } from './host-ref';
-import { proxyComponent, unshadowMembers } from './proxy-component';
-import { attachStyles, registerStyle } from './styles';
+import { getHostRef, HOST_FLAGS } from './host-ref';
+import { defineReactiveMembers } from './reactive-members';
+import { attachStyles, registerStyles } from './styles';
 import type { ComponentRuntimeMeta } from './types';
 import { scheduleUpdate } from './update-component';
 
@@ -12,19 +12,34 @@ import { scheduleUpdate } from './update-component';
  * constructor is mutated in place and returned.
  *
  * Eager profile: the element is the component instance; there is no lazy loading.
+ * Parameters are positional (ordered by how often the compiler emits them) so the
+ * generated call sites stay compact.
  *
+ * @param tagName the component's tag name
  * @param Cstr the component constructor to augment
- * @param cmpMeta runtime metadata for the component
+ * @param styles the component's CSS chunks
+ * @param members the reactive `@Prop`/`@State` member names (watched props are folded in)
+ * @param watched maps a watched property to the method names that `@Watch` it
  * @returns the same constructor, augmented
  */
 export const proxyCustomElement = <T extends CustomElementConstructor>(
+  tagName: string,
   Cstr: T,
-  cmpMeta: ComponentRuntimeMeta,
+  styles?: string[],
+  members?: string[],
+  watched?: Record<string, string[]>,
 ): T => {
-  proxyComponent(Cstr, cmpMeta);
+  const cmpMeta: ComponentRuntimeMeta = {
+    $tagName$: tagName,
+    $styles$: styles,
+    $members$: members,
+    $watched$: watched,
+  };
 
-  if (cmpMeta.$style$ != null) {
-    registerStyle(cmpMeta.$tagName$, cmpMeta.$style$);
+  defineReactiveMembers(Cstr, cmpMeta);
+
+  if (styles) {
+    registerStyles(tagName, styles);
   }
 
   const proto = Cstr.prototype as Record<string, unknown>;
@@ -32,12 +47,14 @@ export const proxyCustomElement = <T extends CustomElementConstructor>(
   const originalDisconnectedCallback = proto.disconnectedCallback as ((this: HostElement) => void) | undefined;
 
   proto.connectedCallback = function (this: HostElement): void {
-    const hostRef = getHostRef(this) ?? registerHost(this);
+    // The host reference is registered at construction (the compiler injects
+    // `baseConstructor(this)` into the component constructor), so it is
+    // guaranteed to exist here.
+    const hostRef = getHostRef(this)!;
     if (!(hostRef.$flags$ & HOST_FLAGS.hasConnected)) {
       hostRef.$flags$ |= HOST_FLAGS.hasConnected;
-      unshadowMembers(this, cmpMeta);
       attachShadow(this);
-      attachStyles(this, cmpMeta.$tagName$);
+      attachStyles(this, tagName);
       scheduleUpdate(hostRef);
     }
     originalConnectedCallback?.call(this);
@@ -47,21 +64,18 @@ export const proxyCustomElement = <T extends CustomElementConstructor>(
     originalDisconnectedCallback?.call(this);
   };
 
-  Object.defineProperty(Cstr, 'is', { value: cmpMeta.$tagName$, configurable: true });
-
   return Cstr;
 };
 
 /**
  * Attach an open shadow root, reusing one already present (e.g. from a
- * Declarative Shadow DOM template) as long as it is open.
+ * Declarative Shadow DOM template). A present `shadowRoot` is always open — the
+ * getter returns `null` for closed roots — so no mode check is needed.
  *
  * @param elm the host element
  */
 const attachShadow = (elm: HostElement): void => {
   if (!elm.shadowRoot) {
     elm.attachShadow({ mode: 'open' });
-  } else if (elm.shadowRoot.mode !== 'open') {
-    throw new Error(`<${elm.tagName.toLowerCase()}>: only open shadow roots are supported`);
   }
 };

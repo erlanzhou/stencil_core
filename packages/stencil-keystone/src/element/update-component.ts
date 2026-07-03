@@ -13,7 +13,7 @@ export const scheduleUpdate = (hostRef: HostRef): void => {
     return;
   }
   hostRef.$flags$ |= HOST_FLAGS.isQueuedForUpdate;
-  Promise.resolve().then(() => updateComponent(hostRef));
+  queueMicrotask(() => updateComponent(hostRef));
 };
 
 /**

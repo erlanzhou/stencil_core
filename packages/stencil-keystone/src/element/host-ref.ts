@@ -8,11 +8,10 @@ import type { HostElement, VNode } from '../internal/types';
  * esbuild transform, which cannot inline cross-file const enums).
  */
 export enum HOST_FLAGS {
-  hasConnected = 1 << 0,
-  hasRendered = 1 << 1,
-  isQueuedForUpdate = 1 << 2,
-  isConstructingInstance = 1 << 3,
-  isWatchReady = 1 << 4,
+  hasConnected = 0b0001,
+  hasRendered = 0b0010,
+  isQueuedForUpdate = 0b0100,
+  isWatchReady = 0b1000,
 }
 
 /**
@@ -27,7 +26,13 @@ export interface HostRef extends RenderHostRef {
   $instanceValues$: Map<string, unknown>;
 }
 
-const hostRefs = new WeakMap<HostElement, HostRef>();
+/**
+ * The runtime host reference is attached directly to the element under this key
+ * — the same approach React takes with `__reactFiber$…`/`__reactProps$…` — rather
+ * than hidden in a side table. This keeps it reachable from the element itself
+ * (`$0.__hostRef$` in devtools), which aids debugging.
+ */
+const HOST_REF = '__hostRef$';
 
 /**
  * Look up the runtime host reference for an element, if one has been registered.
@@ -35,20 +40,39 @@ const hostRefs = new WeakMap<HostElement, HostRef>();
  * @param elm the host element
  * @returns the host reference, or `undefined` if the element is not registered
  */
-export const getHostRef = (elm: HostElement): HostRef | undefined => hostRefs.get(elm);
+export const getHostRef = (elm: HostElement): HostRef | undefined => elm[HOST_REF];
 
 /**
- * Create and store a fresh host reference for an element.
+ * Create and store a fresh host reference on an element. Internal primitive;
+ * components register through {@link baseConstructor}.
  *
  * @param elm the host element to register
  * @returns the newly created host reference
  */
-export const registerHost = (elm: HostElement): HostRef => {
+const registerHost = (elm: HostElement): HostRef => {
   const hostRef: HostRef = {
-    $flags$: 0,
+    $flags$: 0b0000,
     $hostElement$: elm,
     $instanceValues$: new Map(),
   };
-  hostRefs.set(elm, hostRef);
+  elm[HOST_REF] = hostRef;
   return hostRef;
+};
+
+/**
+ * The construction-time registration hook the compiler injects as the first
+ * statement of a component's constructor:
+ *
+ * ```js
+ * constructor() { super(); baseConstructor(this); }
+ * ```
+ *
+ * Fixing host registration at construction — before any field initializer or a
+ * wrapper's pre-mount `el.prop = x` — lets every other runtime site rely on
+ * `getHostRef` returning a value instead of registering lazily.
+ *
+ * @param elm the host element being constructed
+ */
+export const baseConstructor = (elm: HostElement): void => {
+  registerHost(elm);
 };

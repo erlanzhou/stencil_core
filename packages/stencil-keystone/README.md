@@ -14,12 +14,11 @@ a (shadow) DOM. Framework wrappers (React, Vue2) sit above it.
 - JSX runtimes (`jsx`, `jsxs`, `jsxDEV`)
 - DOM patching (`renderVdom`, `patch`, `isSameVnode`)
 - Element attribute/prop patching (`updateElement`, `setAccessor`)
-- Lightweight container render API (`render`)
 
 ## Public entrypoint
 
 ```ts
-import { h, render } from 'stencil-keystone';
+import { h, renderVdom } from 'stencil-keystone';
 ```
 
 ## Build

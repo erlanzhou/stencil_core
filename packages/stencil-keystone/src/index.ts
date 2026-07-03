@@ -9,7 +9,6 @@ export type {
   VNode,
   VNodeData,
 } from './internal/types';
-export { render } from './render';
 export { h, Host, isHost, newVNode } from './vdom/h';
 export { jsxDEV } from './vdom/jsx-dev-runtime';
 export { Fragment, jsx, jsxs } from './vdom/jsx-runtime';

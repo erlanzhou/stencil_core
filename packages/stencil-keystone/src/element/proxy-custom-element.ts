@@ -18,7 +18,8 @@ import { scheduleUpdate } from './update-component';
  * @param tagName the component's tag name
  * @param Cstr the component constructor to augment
  * @param styles the component's CSS chunks
- * @param members the reactive `@Prop`/`@State` member names (watched props are folded in)
+ * @param members the reactive member names not already implied by `defaults`/`watched`
+ * @param defaults default values for `@Prop` members (its keys are also members)
  * @param watched maps a watched property to the method names that `@Watch` it
  * @returns the same constructor, augmented
  */
@@ -27,12 +28,14 @@ export const proxyCustomElement = <T extends CustomElementConstructor>(
   Cstr: T,
   styles?: string[],
   members?: string[],
+  defaults?: Record<string, unknown>,
   watched?: Record<string, string[]>,
 ): T => {
   const cmpMeta: ComponentRuntimeMeta = {
     $tagName$: tagName,
     $styles$: styles,
     $members$: members,
+    $defaults$: defaults,
     $watched$: watched,
   };
 

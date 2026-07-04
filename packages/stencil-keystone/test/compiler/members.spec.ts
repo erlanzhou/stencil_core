@@ -5,7 +5,7 @@ import { transform } from '../../src/compiler/index';
 const compile = (src: string) => transform(src, 'test.tsx')?.code ?? '';
 
 describe('compiler — @Prop / @State', () => {
-  it('collects members and moves initializers into the constructor', () => {
+  it('routes @Prop defaults into `defaults`, seeds @State in the constructor', () => {
     const out = compile(`
       import { Component, Prop, State } from 'stencil-keystone';
       @Component({ name: 'x-counter' })
@@ -16,27 +16,27 @@ describe('compiler — @Prop / @State', () => {
       }
     `);
 
-    // both names collected, order preserved. `styles` is omitted here, so
-    // `emitRegistration` (unchanged from Task 2) emits an explicit `undefined`
-    // placeholder to keep `members` in its correct positional slot per
-    // `proxyCustomElement`'s real signature (tagName, Cstr, styles?, members?, watched?).
+    // `step` (a @Prop default) rides in the defaults object and is NOT repeated in
+    // members; `count` (a @State) stays in members and is seeded in the constructor.
+    // Positional order: (tag, Cstr, styles?, members?, defaults?, watched?).
     expect(out).toMatch(
-      /proxyCustomElement\(\s*"x-counter"\s*,\s*XCounter\s*,\s*(?:undefined\s*,\s*)?\[\s*"step"\s*,\s*"count"\s*\]/,
+      /proxyCustomElement\(\s*"x-counter"\s*,\s*XCounter\s*,\s*undefined\s*,\s*\[\s*"count"\s*\]\s*,\s*\{\s*step\s*:\s*1\s*\}/,
     );
+    // @State initializer seeded per-instance; @Prop default is NOT a constructor seed
+    expect(out).toMatch(/this\.count\s*=\s*0/);
+    expect(out).not.toMatch(/this\.step/);
     // no field declarations remain (they would shadow the reactive accessor)
     expect(out).not.toMatch(/@Prop|@State/);
-    // initializers routed through the setter in the constructor
-    expect(out).toMatch(/this\.step\s*=\s*1/);
-    expect(out).toMatch(/this\.count\s*=\s*0/);
   });
 
-  it('collects a member with no initializer without a constructor seed', () => {
+  it('lists a @Prop without an initializer in members (no default, no seed)', () => {
     const out = compile(`
       import { Component, Prop } from 'stencil-keystone';
       @Component({ name: 'x-p' })
       export class XP { @Prop() label; render() { return null; } }
     `);
-    expect(out).toMatch(/\[\s*"label"\s*\]/);
+    // no initializer → no default object, just a members entry
+    expect(out).toMatch(/proxyCustomElement\(\s*"x-p"\s*,\s*XP\s*,\s*undefined\s*,\s*\[\s*"label"\s*\]\s*\)/);
     expect(out).not.toMatch(/this\.label\s*=/);
   });
 });

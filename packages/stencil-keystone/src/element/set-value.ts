@@ -36,11 +36,15 @@ export const setValue = (
   // `el.prop = x` before mount — already have a host reference to write into.
   const hostRef = getHostRef(ref)!;
   const instanceValues = hostRef.$instanceValues$;
-  const oldVal = instanceValues.get(propName);
-  if (instanceValues.has(propName) && Object.is(newVal, oldVal)) {
+  const rawOld = instanceValues.get(propName);
+  if (instanceValues.has(propName) && Object.is(newVal, rawOld)) {
     return;
   }
   instanceValues.set(propName, newVal);
+
+  // The effective previous value @Watch sees: fall back to the default when the
+  // prop had never been explicitly set (matching what the getter would return).
+  const oldVal = rawOld !== undefined ? rawOld : cmpMeta.$defaults$?.[propName];
 
   const instance = ref as unknown as Record<string, unknown>;
 

@@ -24,7 +24,7 @@ describe('element runtime — slice 3: @Watch', () => {
     }
     // `value` is only passed as a watched prop — it still gets a reactive accessor,
     // since watched props are inherently reactive.
-    proxyCustomElement('x-watched', Watched, undefined, undefined, { value: ['onValueChange'] });
+    proxyCustomElement('x-watched', Watched, undefined, undefined, undefined, { value: ['onValueChange'] });
     customElements.define('x-watched', Watched);
 
     const el = document.createElement('x-watched') as HTMLElement & { value: number };
@@ -59,7 +59,7 @@ describe('element runtime — slice 3: @Watch', () => {
         return h('span', null, `${this.value}`);
       }
     }
-    proxyCustomElement('x-init', Init, undefined, undefined, { value: ['onValueChange'] });
+    proxyCustomElement('x-init', Init, undefined, undefined, undefined, { value: ['onValueChange'] });
     customElements.define('x-init', Init);
 
     const el = document.createElement('x-init') as HTMLElement & { value: number };

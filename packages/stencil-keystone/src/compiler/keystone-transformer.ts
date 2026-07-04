@@ -7,6 +7,8 @@ export interface ComponentContext {
   tagName: string;
   styles?: ts.Expression;
   members: string[];
+  /** `@Prop` initializers, keyed by member name (insertion order preserved). */
+  defaults: Map<string, ts.Expression>;
   watched: Record<string, string[]>;
   eventSeeds: ts.Statement[];
   propSeeds: ts.Statement[];
@@ -380,6 +382,7 @@ const transformComponentClass = (
     tagName,
     styles: stylesExpr && freshenStringLiterals(stylesExpr, f),
     members: [],
+    defaults: new Map(),
     watched: {},
     eventSeeds: [],
     propSeeds: [],
@@ -427,11 +430,19 @@ const collectMembers = (node: ts.ClassDeclaration, f: ts.NodeFactory, ctx: Compo
         const name = member.name.text;
         ctx.members.push(name);
         if (member.initializer) {
-          ctx.propSeeds.push(
-            f.createExpressionStatement(
-              f.createAssignment(f.createPropertyAccessExpression(f.createThis(), name), member.initializer),
-            ),
-          );
+          if (isProp) {
+            // A `@Prop` default rides along in `proxyCustomElement`; the getter
+            // returns it when the value is undefined (React/Vue defaultProps).
+            ctx.defaults.set(name, member.initializer);
+          } else {
+            // A `@State` initializer is seeded per-instance in the constructor, so
+            // setting it to undefined keeps undefined (component-controlled state).
+            ctx.propSeeds.push(
+              f.createExpressionStatement(
+                f.createAssignment(f.createPropertyAccessExpression(f.createThis(), name), member.initializer),
+              ),
+            );
+          }
         }
         continue; // drop the field: the runtime accessor backs it
       }
@@ -557,9 +568,21 @@ const emitRegistration = (f: ts.NodeFactory, ctx: ComponentContext): ts.Statemen
   const nameLit = f.createStringLiteral(ctx.tagName);
   const classId = f.createIdentifier(ctx.className);
 
-  const membersExpr = ctx.members.length
-    ? f.createArrayLiteralExpression(ctx.members.map((m) => f.createStringLiteral(m)))
+  // `defaults` and `watched` keys are folded into the reactive member set by the
+  // runtime, so list in `members` only the names covered by neither.
+  const memberList = ctx.members.filter((m) => !ctx.defaults.has(m) && !Object.hasOwn(ctx.watched, m));
+  const membersExpr = memberList.length
+    ? f.createArrayLiteralExpression(memberList.map((m) => f.createStringLiteral(m)))
     : undefined;
+
+  const defaultsExpr = ctx.defaults.size
+    ? f.createObjectLiteralExpression(
+        [...ctx.defaults].map(([name, expr]) =>
+          f.createPropertyAssignment(f.createIdentifier(name), freshenStringLiterals(expr, f)),
+        ),
+      )
+    : undefined;
+
   const watchedExpr = Object.keys(ctx.watched).length
     ? f.createObjectLiteralExpression(
         Object.entries(ctx.watched).map(([k, methods]) =>
@@ -571,7 +594,7 @@ const emitRegistration = (f: ts.NodeFactory, ctx: ComponentContext): ts.Statemen
       )
     : undefined;
 
-  const optional: (ts.Expression | undefined)[] = [ctx.styles, membersExpr, watchedExpr];
+  const optional: (ts.Expression | undefined)[] = [ctx.styles, membersExpr, defaultsExpr, watchedExpr];
   let last = optional.length;
   while (last > 0 && optional[last - 1] === undefined) last--;
   const tail = optional

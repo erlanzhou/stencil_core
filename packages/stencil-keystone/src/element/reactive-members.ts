@@ -32,10 +32,14 @@ const vueValueEcho = new WeakMap<object, string>();
 export const defineReactiveMembers = (Cstr: CustomElementConstructor, cmpMeta: ComponentRuntimeMeta): void => {
   const proto = Cstr.prototype as object;
 
-  // A watched property is inherently reactive, so fold `$watched$` keys into the
-  // set of members that get accessors — the compiler can then omit them from
-  // `$members$` instead of listing every watched prop twice in cmpMeta.
-  const memberNames = new Set([...(cmpMeta.$members$ ?? []), ...Object.keys(cmpMeta.$watched$ ?? {})]);
+  // `$defaults$` and `$watched$` keys are inherently reactive members, so fold
+  // them into the set that gets accessors — the compiler then omits those names
+  // from `$members$` instead of listing them twice in cmpMeta.
+  const memberNames = new Set([
+    ...(cmpMeta.$members$ ?? []),
+    ...Object.keys(cmpMeta.$defaults$ ?? {}),
+    ...Object.keys(cmpMeta.$watched$ ?? {}),
+  ]);
 
   for (const memberName of memberNames) {
     // Preserve any author-declared getter/setter for this member.
@@ -59,7 +63,13 @@ export const defineReactiveMembers = (Cstr: CustomElementConstructor, cmpMeta: C
 
     Object.defineProperty(proto, memberName, {
       get(this: HostElement): unknown {
-        return origGetter ? origGetter.call(this) : getValue(this, memberName);
+        if (origGetter) {
+          return origGetter.call(this);
+        }
+        const value = getValue(this, memberName);
+        // Return the default when unset (React/Vue defaultProps semantics). `@State`
+        // has no `$defaults$` entry, so setting it to undefined keeps undefined.
+        return value === undefined ? cmpMeta.$defaults$?.[memberName] : value;
       },
       set: isValue
         ? function (this: HostElement, newValue: unknown): void {
@@ -87,7 +97,8 @@ export const defineReactiveMembers = (Cstr: CustomElementConstructor, cmpMeta: C
       // `el.value = String(raw)` that Vue writes immediately after.
       Object.defineProperty(proto, '_value', {
         get(this: HostElement): unknown {
-          return getValue(this, 'value');
+          const value = getValue(this, 'value');
+          return value === undefined ? cmpMeta.$defaults$?.value : value;
         },
         set(this: HostElement, raw: unknown): void {
           // Match Vue's own stringification (undefined/null → '').

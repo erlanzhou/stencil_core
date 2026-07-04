@@ -208,6 +208,10 @@ const collectMembers = (node: ts.ClassDeclaration, f: ts.NodeFactory, ctx: Compo
         kept.push(stripDecorators(member, f));
         continue;
       }
+      if (getDecorator(member, 'Method')) {
+        kept.push(stripDecorators(member, f));
+        continue;
+      }
     }
     kept.push(member);
   }

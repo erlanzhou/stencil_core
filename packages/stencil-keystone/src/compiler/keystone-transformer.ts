@@ -139,9 +139,8 @@ const transformComponentClass = (
     usesCreateEvent: false,
   };
 
-  // Member visiting is filled in by later tasks; for now keep members as-is
-  // (minus the class-level @Component decorator) and rebuild the constructor.
-  const members = rebuildConstructor(node, f, ctx);
+  const kept = collectMembers(node, f, ctx);
+  const members = rebuildConstructor(kept, node, f, ctx);
 
   const heritage = node.heritageClauses?.length
     ? node.heritageClauses
@@ -163,8 +162,34 @@ const transformComponentClass = (
   return { classNode, ctx };
 };
 
+/** Lower member decorators, populating `ctx`. Returns the members to keep as-is. */
+const collectMembers = (node: ts.ClassDeclaration, f: ts.NodeFactory, ctx: ComponentContext): ts.ClassElement[] => {
+  const kept: ts.ClassElement[] = [];
+  for (const member of node.members) {
+    if (ts.isPropertyDeclaration(member) && ts.isIdentifier(member.name)) {
+      const isProp = !!getDecorator(member, 'Prop');
+      const isState = !!getDecorator(member, 'State');
+      if (isProp || isState) {
+        const name = member.name.text;
+        ctx.members.push(name);
+        if (member.initializer) {
+          ctx.propSeeds.push(
+            f.createExpressionStatement(
+              f.createAssignment(f.createPropertyAccessExpression(f.createThis(), name), member.initializer),
+            ),
+          );
+        }
+        continue; // drop the field: the runtime accessor backs it
+      }
+    }
+    kept.push(member);
+  }
+  return kept;
+};
+
 /** Rebuild (or synthesize) the constructor so it registers the host at construction. */
 const rebuildConstructor = (
+  kept: ts.ClassElement[],
   node: ts.ClassDeclaration,
   f: ts.NodeFactory,
   ctx: ComponentContext,
@@ -179,7 +204,7 @@ const rebuildConstructor = (
 
   const superCall = f.createExpressionStatement(f.createCallExpression(f.createSuper(), undefined, []));
 
-  const existing = node.members.find((m): m is ts.ConstructorDeclaration => ts.isConstructorDeclaration(m));
+  const existing = kept.find((m): m is ts.ConstructorDeclaration => ts.isConstructorDeclaration(m));
 
   const buildBody = (rest: ts.Statement[]): ts.Block =>
     f.createBlock([superCall, ...injected, ...rest], true);
@@ -193,7 +218,7 @@ const rebuildConstructor = (
       )
     : f.createConstructorDeclaration(undefined, [], buildBody([]));
 
-  const others = node.members.filter((m) => !ts.isConstructorDeclaration(m));
+  const others = kept.filter((m) => !ts.isConstructorDeclaration(m));
   return [newCtor, ...others];
 };
 

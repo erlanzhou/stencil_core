@@ -39,8 +39,20 @@ end-user bundler that consumes the library.
   - Vite (and therefore `vitest`) consumes Rollup plugins natively — no
     `unplugin`, no extra runtime deps. `unplugin` is only warranted later if a
     Webpack/Rspack consumer appears.
-- Adds a **`typescript` devDependency**, reachable only from the `/compiler`
-  entry. The runtime entry (`.`) stays zero-dependency.
+- Adds a **`typescript` devDependency** (`^6.0.3`), reachable only from the
+  `/compiler` entry. The runtime entry (`.`) stays zero-dependency.
+- **TS 6, not native TS 7.** As of 2026-07 `typescript@latest` is 6.0.3 and
+  `typescript@rc` is 7.0.1-rc (the native Go port). Native TS 7 does not expose
+  the programmatic transformer API (`transpileModule` + custom `before`
+  transformers) this compiler is built on, so TS 6.0.3 — newest stable, full JS
+  Compiler API — is the target. Revisit TS 7 only once it ships a transform API.
+- **Modern (standard) decorators, fully stripped.** `experimentalDecorators` is
+  never enabled. Because Stencil-style decorators are compile-time-only markers
+  with no runtime implementation, the transformer must strip *every* decorator on
+  a component class — otherwise standard-decorator emit produces `__esDecorate`
+  machinery that calls the marker (`Prop()`) at runtime and crashes. It also
+  removes the now-dead compile-time-only imports (`Component`, `Prop`, `State`,
+  `Watch`, `Event`, `Method`, `EventEmitter`) from the runtime-module import.
 
 ## Compilation pipeline
 

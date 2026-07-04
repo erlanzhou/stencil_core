@@ -181,6 +181,22 @@ const collectMembers = (node: ts.ClassDeclaration, f: ts.NodeFactory, ctx: Compo
         }
         continue; // drop the field: the runtime accessor backs it
       }
+      if (getDecorator(member, 'Event')) {
+        const name = member.name.text;
+        ctx.usesCreateEvent = true;
+        ctx.eventSeeds.push(
+          f.createExpressionStatement(
+            f.createAssignment(
+              f.createPropertyAccessExpression(f.createThis(), name),
+              f.createCallExpression(f.createIdentifier('createEvent'), undefined, [
+                f.createThis(),
+                f.createStringLiteral(name),
+              ]),
+            ),
+          ),
+        );
+        continue; // drop the field
+      }
     }
     if (ts.isMethodDeclaration(member) && ts.isIdentifier(member.name)) {
       const watch = getDecorator(member, 'Watch');

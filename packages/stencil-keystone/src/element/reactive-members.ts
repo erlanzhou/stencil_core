@@ -65,8 +65,10 @@ export const defineReactiveMembers = (Cstr: CustomElementConstructor, cmpMeta: C
         ? function (this: HostElement, newValue: unknown): void {
             // Swallow Vue 2's stringified echo of a preceding `_value` write, so it
             // doesn't overwrite the raw value that the write-through already set.
-            if (vueValueEcho.has(this)) {
-              const echo = vueValueEcho.get(this);
+            // A single `get` keeps the common no-echo path to one lookup — the echo
+            // is always a string, so `undefined` unambiguously means "not armed".
+            const echo = vueValueEcho.get(this);
+            if (echo !== undefined) {
               vueValueEcho.delete(this);
               if (newValue === echo) {
                 return;

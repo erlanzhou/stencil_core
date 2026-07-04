@@ -1,6 +1,6 @@
 import ts from 'typescript';
 
-import { keystoneTransformer } from './keystone-transformer';
+import { containsKeystoneComponent, keystoneTransformer } from './keystone-transformer';
 
 export interface TransformOptions {
   dev?: boolean;
@@ -15,10 +15,24 @@ export interface TransformResult {
 
 /** Compile a single source file. Returns `null` for files without `@Component`. */
 export const transform = (code: string, id: string, opts: TransformOptions = {}): TransformResult | null => {
-  if (!/@Component\s*\(/.test(code)) {
+  // Cheap substring pre-filter: bail before paying for a real parse when the
+  // file couldn't possibly reference the runtime's `Component` decorator.
+  // Deliberately looser than `/@Component\s*\(/` — an aliased import
+  // (`import { Component as C } from '...'`) never spells "@Component(" in
+  // the decorator usage itself, only in the import specifier, so matching
+  // just the identifier "Component" is required to let aliased files reach
+  // the real provenance check below instead of being rejected here.
+  if (!/Component/.test(code)) {
     return null;
   }
   const { dev = false, jsxImportSource = 'stencil-keystone', runtimeModule = 'stencil-keystone' } = opts;
+
+  // Cheap regex above only says the token appears; confirm a real keystone
+  // component (a class whose @Component resolves to a runtime-module import)
+  // before transforming — otherwise pass the file through untouched.
+  if (!containsKeystoneComponent(code, id, runtimeModule)) {
+    return null;
+  }
 
   const out = ts.transpileModule(code, {
     fileName: id,

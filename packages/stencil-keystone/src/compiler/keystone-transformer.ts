@@ -23,6 +23,62 @@ export interface TransformerConfig {
  */
 const COMPILE_TIME_NAMES = new Set(['Component', 'Prop', 'State', 'Watch', 'Event', 'Method', 'EventEmitter']);
 
+/** Local binding names imported as `Component` from the runtime module (honors `as` aliasing). */
+const collectComponentNames = (sf: ts.SourceFile, runtimeModule: string): Set<string> => {
+  const names = new Set<string>();
+  for (const stmt of sf.statements) {
+    if (
+      ts.isImportDeclaration(stmt) &&
+      ts.isStringLiteral(stmt.moduleSpecifier) &&
+      stmt.moduleSpecifier.text === runtimeModule
+    ) {
+      const named = stmt.importClause?.namedBindings;
+      if (named && ts.isNamedImports(named)) {
+        for (const el of named.elements) {
+          if ((el.propertyName ?? el.name).text === 'Component') {
+            names.add(el.name.text);
+          }
+        }
+      }
+    }
+  }
+  return names;
+};
+
+/** The class's `@Component` decorator, matched by import provenance (its identifier resolves to the runtime `Component`). */
+const getComponentDecorator = (node: ts.ClassDeclaration, componentNames: Set<string>): ts.Decorator | undefined =>
+  ts.getDecorators(node)?.find((d) => {
+    const expr = d.expression;
+    const id = ts.isCallExpression(expr) ? expr.expression : expr;
+    return ts.isIdentifier(id) && componentNames.has(id.text);
+  });
+
+/** Whether `code` has at least one class carrying a provenance-matched `@Component`. */
+export const containsKeystoneComponent = (code: string, fileName: string, runtimeModule: string): boolean => {
+  const sf = ts.createSourceFile(
+    fileName,
+    code,
+    ts.ScriptTarget.ES2022,
+    /* setParentNodes */ true,
+    /\.[jt]sx$/.test(fileName) ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+  const componentNames = collectComponentNames(sf, runtimeModule);
+  if (componentNames.size === 0) {
+    return false;
+  }
+  let found = false;
+  const walk = (n: ts.Node): void => {
+    if (found) return;
+    if (ts.isClassDeclaration(n) && getComponentDecorator(n, componentNames)) {
+      found = true;
+      return;
+    }
+    ts.forEachChild(n, walk);
+  };
+  ts.forEachChild(sf, walk);
+  return found;
+};
+
 /**
  * The single `before` transformer: lowers `@Component`/member decorators on
  * every component class into the runtime's compiled shape.
@@ -33,12 +89,13 @@ export const keystoneTransformer =
     const f = context.factory;
 
     return (sourceFile) => {
+      const componentNames = collectComponentNames(sourceFile, config.runtimeModule);
       const registrations: ts.Statement[] = [];
       const imports = new Set<string>();
 
       const visit: ts.Visitor = (node) => {
-        if (ts.isClassDeclaration(node) && node.name && getDecorator(node, 'Component')) {
-          const { classNode, ctx } = transformComponentClass(node, f);
+        if (ts.isClassDeclaration(node) && node.name && getComponentDecorator(node, componentNames)) {
+          const { classNode, ctx } = transformComponentClass(node, f, componentNames);
           imports.add('proxyCustomElement');
           imports.add('baseConstructor');
           if (ctx.usesCreateEvent) imports.add('createEvent');
@@ -53,19 +110,23 @@ export const keystoneTransformer =
 
       let sf = ts.visitNode(sourceFile, visit) as ts.SourceFile;
 
-      const importDecl = f.createImportDeclaration(
-        undefined,
-        f.createImportClause(
-          false,
-          undefined,
-          f.createNamedImports(
-            [...imports].map((n) => f.createImportSpecifier(false, undefined, f.createIdentifier(n))),
-          ),
-        ),
-        f.createStringLiteral(config.runtimeModule),
-      );
+      const head = imports.size
+        ? [
+            f.createImportDeclaration(
+              undefined,
+              f.createImportClause(
+                false,
+                undefined,
+                f.createNamedImports(
+                  [...imports].map((n) => f.createImportSpecifier(false, undefined, f.createIdentifier(n))),
+                ),
+              ),
+              f.createStringLiteral(config.runtimeModule),
+            ),
+          ]
+        : [];
 
-      return f.updateSourceFile(sf, [importDecl, ...sf.statements, ...registrations]);
+      return f.updateSourceFile(sf, [...head, ...sf.statements, ...registrations]);
     };
   };
 
@@ -121,11 +182,18 @@ const freshenStringLiterals = <T extends ts.Node>(node: T, f: ts.NodeFactory): T
 const transformComponentClass = (
   node: ts.ClassDeclaration,
   f: ts.NodeFactory,
+  componentNames: Set<string>,
 ): { classNode: ts.ClassDeclaration; ctx: ComponentContext } => {
-  const componentDec = getDecorator(node, 'Component')!;
+  const componentDec = getComponentDecorator(node, componentNames)!;
   const options = getDecoratorObject(componentDec);
   const nameExpr = options && getObjectProp(options, 'name');
-  const tagName = nameExpr && ts.isStringLiteralLike(nameExpr) ? nameExpr.text : '';
+  if (!nameExpr || !ts.isStringLiteralLike(nameExpr)) {
+    throw new Error(
+      `@Component on "${node.name?.text ?? '(anonymous)'}" requires a string-literal "name" option` +
+        (nameExpr ? ' (got a non-literal expression)' : options ? ' (missing "name")' : ' (missing options object)'),
+    );
+  }
+  const tagName = nameExpr.text;
   const stylesExpr = options && getObjectProp(options, 'styles');
 
   const ctx: ComponentContext = {

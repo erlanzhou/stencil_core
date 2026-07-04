@@ -118,7 +118,7 @@ export const keystoneTransformer =
 
       const visit: ts.Visitor = (node) => {
         if (ts.isClassDeclaration(node) && node.name && getComponentDecorator(node, componentNames)) {
-          const { classNode, ctx } = transformComponentClass(node, f, componentNames);
+          const { classNode, ctx } = transformComponentClass(node, f, componentNames, context);
           imports.add('proxyCustomElement');
           imports.add('baseConstructor');
           if (ctx.usesCreateEvent) imports.add('createEvent');
@@ -215,19 +215,153 @@ const freshenStringLiterals = <T extends ts.Node>(node: T, f: ts.NodeFactory): T
   return visit(node) as T;
 };
 
+/** The base62 alphabet (`a-z`, `A-Z`, `0-9`) used to encode auto-key sequence numbers. */
+const AUTO_KEY_ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+/**
+ * Encode a per-component sequence number as a compact auto-key: `"^"` followed by
+ * its base62 representation (`0 → "^a"`, `1 → "^b"`, ..., `62 → "^ba"`). The `^`
+ * prefix marks the key as compiler-generated so it will not collide with author keys.
+ *
+ * @param seq the zero-based sequence number within the component
+ * @returns the encoded auto-key string
+ */
+const encodeAutoKey = (seq: number): string => {
+  let n = seq;
+  let out = '';
+  do {
+    out = AUTO_KEY_ALPHABET[n % 62] + out;
+    n = Math.floor(n / 62);
+  } while (n > 0);
+  return `^${out}`;
+};
+
+/**
+ * Count the `return` statements reachable in a method without descending into a
+ * `return`'s own subtree (nested callbacks' returns are still counted). A render
+ * with more than one return is left un-keyed, since a fixed key across branches
+ * would force needless re-renders.
+ *
+ * @param method the method declaration to scan
+ * @returns the number of `return` statements found
+ */
+const countReturnStatements = (method: ts.MethodDeclaration): number => {
+  let count = 0;
+  const walk = (node: ts.Node): void => {
+    ts.forEachChild(node, (child) => {
+      if (ts.isReturnStatement(child)) {
+        count++;
+      } else {
+        walk(child);
+      }
+    });
+  };
+  walk(method);
+  return count;
+};
+
+/**
+ * Prepend a generated `key` attribute to a JSX element, unless it already has one
+ * (an author key is preserved and consumes no sequence slot).
+ *
+ * @param el the JSX opening or self-closing element
+ * @param f the node factory
+ * @param seq a mutable per-component sequence counter
+ * @returns the element, with an auto-key prepended when it had none
+ */
+const addAutoKey = <T extends ts.JsxOpeningElement | ts.JsxSelfClosingElement>(
+  el: T,
+  f: ts.NodeFactory,
+  seq: { next: number },
+): T => {
+  const hasKey = el.attributes.properties.some(
+    (a) => ts.isJsxAttribute(a) && ts.isIdentifier(a.name) && a.name.text === 'key',
+  );
+  if (hasKey) {
+    return el;
+  }
+  const attributes = f.createJsxAttributes([
+    f.createJsxAttribute(f.createIdentifier('key'), f.createStringLiteral(encodeAutoKey(seq.next++))),
+    ...el.attributes.properties,
+  ]);
+  return (
+    ts.isJsxOpeningElement(el)
+      ? f.updateJsxOpeningElement(el, el.tagName, el.typeArguments, attributes)
+      : f.updateJsxSelfClosingElement(el, el.tagName, el.typeArguments, attributes)
+  ) as T;
+};
+
+/**
+ * Give every statically-positioned JSX element in a single-`return` render a
+ * stable `key`, so the vdom diff cannot confuse same-tag siblings across renders.
+ * JSX inside call-expression arguments (e.g. `list.map(...)`) or ternary branches
+ * is skipped — a fixed key there would force wrong reuse; those need author keys.
+ *
+ * @param method the `render` method declaration
+ * @param f the node factory
+ * @param context the transformation context
+ * @param seq a mutable per-component sequence counter
+ * @returns the render method with auto-keys inserted
+ */
+const keyStaticJsx = (
+  method: ts.MethodDeclaration,
+  f: ts.NodeFactory,
+  context: ts.TransformationContext,
+  seq: { next: number },
+): ts.MethodDeclaration => {
+  const visit: ts.Visitor = (node) => {
+    if (ts.isCallExpression(node) || ts.isConditionalExpression(node)) {
+      return node; // don't descend: dynamic/branching JSX must not be auto-keyed
+    }
+    if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+      return addAutoKey(node, f, seq);
+    }
+    return ts.visitEachChild(node, visit, context);
+  };
+  return ts.visitEachChild(method, visit, context);
+};
+
+/**
+ * Insert automatic keys into a component's `render` method (if it has a single
+ * return). The sequence counter is fresh per component, so keys start at `^a`.
+ *
+ * @param members the component's class members
+ * @param f the node factory
+ * @param context the transformation context
+ * @returns the members with the render method's static JSX auto-keyed
+ */
+const insertAutoKeys = (
+  members: ts.ClassElement[],
+  f: ts.NodeFactory,
+  context: ts.TransformationContext,
+): ts.ClassElement[] => {
+  const seq = { next: 0 };
+  return members.map((member) =>
+    ts.isMethodDeclaration(member) &&
+    ts.isIdentifier(member.name) &&
+    member.name.text === 'render' &&
+    countReturnStatements(member) === 1
+      ? keyStaticJsx(member, f, context, seq)
+      : member,
+  );
+};
+
 /**
  * Lower a `@Component` class into its compiled shape: strip the decorator, seed
- * the constructor, and collect its metadata into a {@link ComponentContext}.
+ * the constructor, auto-key its render JSX, and collect its metadata into a
+ * {@link ComponentContext}.
  *
  * @param node the `@Component`-decorated class declaration
  * @param f the node factory
  * @param componentNames local names known to bind the runtime `Component`
+ * @param context the transformation context
  * @returns the rewritten class and the collected component context
  */
 const transformComponentClass = (
   node: ts.ClassDeclaration,
   f: ts.NodeFactory,
   componentNames: Set<string>,
+  context: ts.TransformationContext,
 ): { classNode: ts.ClassDeclaration; ctx: ComponentContext } => {
   const componentDec = getComponentDecorator(node, componentNames)!;
   const options = getDecoratorObject(componentDec);
@@ -252,7 +386,7 @@ const transformComponentClass = (
     usesCreateEvent: false,
   };
 
-  const kept = collectMembers(node, f, ctx);
+  const kept = insertAutoKeys(collectMembers(node, f, ctx), f, context);
   const members = rebuildConstructor(kept, f, ctx);
 
   const heritage = node.heritageClauses?.length

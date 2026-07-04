@@ -39,6 +39,25 @@ await build({
   outfile: resolve(outDir, 'index.cjs'),
 });
 
+const extraEntries = [
+  { in: resolve(pkgRoot, 'src/compiler/index.ts'), base: 'compiler/index', platform: 'node', external: ['typescript'] },
+  { in: resolve(pkgRoot, 'src/vdom/jsx-runtime.ts'), base: 'jsx-runtime', platform: 'browser', external: [] },
+  { in: resolve(pkgRoot, 'src/vdom/jsx-dev-runtime.ts'), base: 'jsx-dev-runtime', platform: 'browser', external: [] },
+];
+
+for (const e of extraEntries) {
+  for (const [format, ext] of [['esm', 'js'], ['cjs', 'cjs']]) {
+    await build({
+      ...common,
+      platform: e.platform,
+      external: e.external,
+      entryPoints: [e.in],
+      format,
+      outfile: resolve(outDir, `${e.base}.${ext}`),
+    });
+  }
+}
+
 // Emit .d.ts for the whole source tree from a real tsc pass (no hand-maintained
 // declaration file to drift out of sync).
 execFileSync('npx', ['tsc', '-p', 'tsconfig.build.json'], { cwd: pkgRoot, stdio: 'inherit' });

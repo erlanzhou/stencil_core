@@ -73,10 +73,29 @@ Set `jsx: 'react-jsx'` (`'react-jsxdev'` in dev) and
 **no** JSX imports itself. (Deliberately unlike upstream Stencil's classic
 `jsxFactory: 'h'`, which never uses those runtime files.)
 
+### Robustness (input gating)
+
+The compiler runs in end-user bundlers via `enforce: 'pre'` on every
+`.[jt]sx?` file, so it must ignore input it does not own:
+
+- **Import provenance.** A class is treated as a keystone component only when
+  its `@Component` decorator's identifier resolves to an import of `Component`
+  from the runtime module (honoring `import { Component as C }` aliasing). A
+  foreign `@Component` (e.g. `@angular/core`) is left untouched. A cheap
+  substring pre-filter short-circuits obviously-irrelevant files; the precise
+  gate is an AST provenance check, and `transform` returns `null` (untouched
+  passthrough) when no provenance-matched component class exists — so a
+  `@Component(` mention in a comment or string is a no-op, and no empty
+  `import {} from '…'` is ever injected.
+- **`name` validation.** `@Component` with a missing or non-string-literal
+  `name` throws a clear compile-time error rather than emitting a crashing
+  `customElements.define("")`.
+
 ### Custom transformer (syntactic)
 
-Acts only on classes decorated with `@Component`. Files without `@Component`
-early-return untouched (so existing hand-written runtime tests are undisturbed).
+Acts only on classes decorated with a provenance-matched `@Component` (see
+Robustness above). Files without such a class early-return untouched (so
+existing hand-written runtime tests are undisturbed).
 
 | Decorator | Constraint | Compile action | Metadata | Injected import |
 |---|---|---|---|---|

@@ -1,6 +1,6 @@
 import ts from 'typescript';
 
-import { getDecorator, getDecoratorObject, getObjectProp, modifiersOf } from './ast';
+import { getDecorator, getDecoratorObject, getDecoratorStringArg, getObjectProp, modifiersOf } from './ast';
 
 export interface ComponentContext {
   className: string;
@@ -182,10 +182,35 @@ const collectMembers = (node: ts.ClassDeclaration, f: ts.NodeFactory, ctx: Compo
         continue; // drop the field: the runtime accessor backs it
       }
     }
+    if (ts.isMethodDeclaration(member) && ts.isIdentifier(member.name)) {
+      const watch = getDecorator(member, 'Watch');
+      if (watch) {
+        const prop = getDecoratorStringArg(watch);
+        if (prop) {
+          (ctx.watched[prop] ??= []).push(member.name.text);
+        }
+        kept.push(stripDecorators(member, f));
+        continue;
+      }
+    }
     kept.push(member);
   }
   return kept;
 };
+
+/** Return a method with all its decorators removed. */
+const stripDecorators = (member: ts.MethodDeclaration, f: ts.NodeFactory): ts.MethodDeclaration =>
+  f.updateMethodDeclaration(
+    member,
+    modifiersOf(member), // drops decorators
+    member.asteriskToken,
+    member.name,
+    member.questionToken,
+    member.typeParameters,
+    member.parameters,
+    member.type,
+    member.body,
+  );
 
 /** Rebuild (or synthesize) the constructor so it registers the host at construction. */
 const rebuildConstructor = (

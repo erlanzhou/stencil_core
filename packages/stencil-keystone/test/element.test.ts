@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { h } from '../src/index';
 import { forceUpdate, proxyCustomElement } from '../src/element/index';
+import { h } from '../src/index';
 import { KeystoneElement } from './keystone-element';
 
 const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));

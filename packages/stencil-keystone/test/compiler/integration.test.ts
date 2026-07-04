@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
-
 import '../fixtures/greeter'; // compiled by the keystone plugin, self-registers
+
+import { describe, expect, it } from 'vitest';
 
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 

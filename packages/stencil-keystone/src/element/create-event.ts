@@ -13,6 +13,7 @@ export interface EventEmitter<T = unknown> {
  *
  * @param ref the host element (`this` in the compiled constructor)
  * @param name the event name (the `@Event` property name)
+ * @returns an emitter whose `emit(detail?)` dispatches the event and returns it
  */
 export const createEvent = <T = unknown>(ref: HostElement, name: string): EventEmitter<T> => ({
   emit: (detail?: T): CustomEvent<T> => {

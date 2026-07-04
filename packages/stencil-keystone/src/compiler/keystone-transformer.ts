@@ -23,7 +23,13 @@ export interface TransformerConfig {
  */
 const COMPILE_TIME_NAMES = new Set(['Component', 'Prop', 'State', 'Watch', 'Event', 'Method', 'EventEmitter']);
 
-/** Local binding names imported as `Component` from the runtime module (honors `as` aliasing). */
+/**
+ * Local binding names imported as `Component` from the runtime module (honors `as` aliasing).
+ *
+ * @param sf the source file whose imports to scan
+ * @param runtimeModule the module specifier the runtime is imported from
+ * @returns the set of local identifiers bound to the runtime's `Component`
+ */
 const collectComponentNames = (sf: ts.SourceFile, runtimeModule: string): Set<string> => {
   const names = new Set<string>();
   for (const stmt of sf.statements) {
@@ -45,7 +51,14 @@ const collectComponentNames = (sf: ts.SourceFile, runtimeModule: string): Set<st
   return names;
 };
 
-/** The class's `@Component` decorator, matched by import provenance (its identifier resolves to the runtime `Component`). */
+/**
+ * The class's `@Component` decorator, matched by import provenance (its identifier
+ * resolves to the runtime `Component`).
+ *
+ * @param node the class declaration to inspect
+ * @param componentNames local names known to bind the runtime `Component`
+ * @returns the matching decorator, or `undefined` if the class has none
+ */
 const getComponentDecorator = (node: ts.ClassDeclaration, componentNames: Set<string>): ts.Decorator | undefined =>
   ts.getDecorators(node)?.find((d) => {
     const expr = d.expression;
@@ -53,7 +66,14 @@ const getComponentDecorator = (node: ts.ClassDeclaration, componentNames: Set<st
     return ts.isIdentifier(id) && componentNames.has(id.text);
   });
 
-/** Whether `code` has at least one class carrying a provenance-matched `@Component`. */
+/**
+ * Whether `code` has at least one class carrying a provenance-matched `@Component`.
+ *
+ * @param code the source text to scan
+ * @param fileName the file path (selects the TS/TSX script kind)
+ * @param runtimeModule the module specifier the runtime is imported from
+ * @returns `true` if a keystone component class is present, otherwise `false`
+ */
 export const containsKeystoneComponent = (code: string, fileName: string, runtimeModule: string): boolean => {
   const sf = ts.createSourceFile(
     fileName,
@@ -82,6 +102,9 @@ export const containsKeystoneComponent = (code: string, fileName: string, runtim
 /**
  * The single `before` transformer: lowers `@Component`/member decorators on
  * every component class into the runtime's compiled shape.
+ *
+ * @param config the transformer configuration (the runtime module specifier)
+ * @returns a TypeScript transformer factory for the emit pipeline
  */
 export const keystoneTransformer =
   (config: TransformerConfig): ts.TransformerFactory<ts.SourceFile> =>
@@ -108,7 +131,7 @@ export const keystoneTransformer =
         return ts.visitEachChild(node, visit, context);
       };
 
-      let sf = ts.visitNode(sourceFile, visit) as ts.SourceFile;
+      const sf = ts.visitNode(sourceFile, visit) as ts.SourceFile;
 
       const head = imports.size
         ? [
@@ -130,13 +153,22 @@ export const keystoneTransformer =
     };
   };
 
-/** Whether an import declaration pulls from the runtime module (`stencil-keystone`). */
+/**
+ * Whether an import declaration pulls from the runtime module (`stencil-keystone`).
+ *
+ * @param node the import declaration to test
+ * @param runtimeModule the module specifier the runtime is imported from
+ * @returns `true` when the import's module specifier is the runtime module
+ */
 const isRuntimeImport = (node: ts.ImportDeclaration, runtimeModule: string): boolean =>
   ts.isStringLiteral(node.moduleSpecifier) && node.moduleSpecifier.text === runtimeModule;
 
 /**
- * Remove compile-time-only names from a runtime-module import. Returns the
- * trimmed import, or `undefined` to drop it entirely when nothing real remains.
+ * Remove compile-time-only names from a runtime-module import.
+ *
+ * @param node the runtime-module import declaration to trim
+ * @param f the node factory
+ * @returns the trimmed import, or `undefined` to drop it when nothing real remains
  */
 const cleanRuntimeImport = (node: ts.ImportDeclaration, f: ts.NodeFactory): ts.ImportDeclaration | undefined => {
   const named = node.importClause?.namedBindings;
@@ -172,6 +204,10 @@ const cleanRuntimeImport = (node: ts.ImportDeclaration, f: ts.NodeFactory): ts.I
  * `styles` array quoted with `'` in the author's source would otherwise emit with
  * single quotes while every other literal the compiler emits (tag names, member
  * names, ...) is double-quoted; this keeps emitted quoting deterministic.
+ *
+ * @param node the expression tree to re-synthesize
+ * @param f the node factory
+ * @returns an equivalent tree with every string literal freshly created
  */
 const freshenStringLiterals = <T extends ts.Node>(node: T, f: ts.NodeFactory): T => {
   const visit = (n: ts.Node): ts.Node =>
@@ -179,6 +215,15 @@ const freshenStringLiterals = <T extends ts.Node>(node: T, f: ts.NodeFactory): T
   return visit(node) as T;
 };
 
+/**
+ * Lower a `@Component` class into its compiled shape: strip the decorator, seed
+ * the constructor, and collect its metadata into a {@link ComponentContext}.
+ *
+ * @param node the `@Component`-decorated class declaration
+ * @param f the node factory
+ * @param componentNames local names known to bind the runtime `Component`
+ * @returns the rewritten class and the collected component context
+ */
 const transformComponentClass = (
   node: ts.ClassDeclaration,
   f: ts.NodeFactory,
@@ -208,7 +253,7 @@ const transformComponentClass = (
   };
 
   const kept = collectMembers(node, f, ctx);
-  const members = rebuildConstructor(kept, node, f, ctx);
+  const members = rebuildConstructor(kept, f, ctx);
 
   const heritage = node.heritageClauses?.length
     ? node.heritageClauses
@@ -230,7 +275,14 @@ const transformComponentClass = (
   return { classNode, ctx };
 };
 
-/** Lower member decorators, populating `ctx`. Returns the members to keep as-is. */
+/**
+ * Lower member decorators, populating `ctx`.
+ *
+ * @param node the component class whose members to process
+ * @param f the node factory
+ * @param ctx the component context to populate (members, watched, seeds)
+ * @returns the class members to keep as-is (decorated fields are dropped)
+ */
 const collectMembers = (node: ts.ClassDeclaration, f: ts.NodeFactory, ctx: ComponentContext): ts.ClassElement[] => {
   const kept: ts.ClassElement[] = [];
   for (const member of node.members) {
@@ -286,7 +338,13 @@ const collectMembers = (node: ts.ClassDeclaration, f: ts.NodeFactory, ctx: Compo
   return kept;
 };
 
-/** Return a method with all its decorators removed. */
+/**
+ * Return a method with all its decorators removed.
+ *
+ * @param member the method declaration to rebuild
+ * @param f the node factory
+ * @returns the method with its decorators stripped and everything else preserved
+ */
 const stripDecorators = (member: ts.MethodDeclaration, f: ts.NodeFactory): ts.MethodDeclaration =>
   f.updateMethodDeclaration(
     member,
@@ -300,13 +358,15 @@ const stripDecorators = (member: ts.MethodDeclaration, f: ts.NodeFactory): ts.Me
     member.body,
   );
 
-/** Rebuild (or synthesize) the constructor so it registers the host at construction. */
-const rebuildConstructor = (
-  kept: ts.ClassElement[],
-  node: ts.ClassDeclaration,
-  f: ts.NodeFactory,
-  ctx: ComponentContext,
-): ts.ClassElement[] => {
+/**
+ * Rebuild (or synthesize) the constructor so it registers the host at construction.
+ *
+ * @param kept the class members to keep (may include an author constructor)
+ * @param f the node factory
+ * @param ctx the component context supplying the event/prop constructor seeds
+ * @returns the class members with the constructor first, registering at construction
+ */
+const rebuildConstructor = (kept: ts.ClassElement[], f: ts.NodeFactory, ctx: ComponentContext): ts.ClassElement[] => {
   const injected: ts.Statement[] = [
     f.createExpressionStatement(
       f.createCallExpression(f.createIdentifier('baseConstructor'), undefined, [f.createThis()]),
@@ -335,7 +395,13 @@ const rebuildConstructor = (
   return [newCtor, ...others];
 };
 
-/** Drop a leading `super(...)` statement so we can re-emit it first ourselves. */
+/**
+ * Drop the `super(...)` call statement from a constructor body so we can re-emit
+ * it first ourselves (a constructor may only legally contain one).
+ *
+ * @param stmts the original constructor body statements
+ * @returns the statements with any direct `super(...)` call removed
+ */
 const dropSuper = (stmts: readonly ts.Statement[]): ts.Statement[] =>
   stmts.filter(
     (s) =>
@@ -346,7 +412,13 @@ const dropSuper = (stmts: readonly ts.Statement[]): ts.Statement[] =>
       ),
   );
 
-/** Emit `proxyCustomElement(...)` + `customElements.define(...)`, trailing empties omitted. */
+/**
+ * Emit `proxyCustomElement(...)` + `customElements.define(...)`, trailing empties omitted.
+ *
+ * @param f the node factory
+ * @param ctx the component context supplying the tag name, styles, members, and watched map
+ * @returns the registration statements to append after the class
+ */
 const emitRegistration = (f: ts.NodeFactory, ctx: ComponentContext): ts.Statement[] => {
   const nameLit = f.createStringLiteral(ctx.tagName);
   const classId = f.createIdentifier(ctx.className);

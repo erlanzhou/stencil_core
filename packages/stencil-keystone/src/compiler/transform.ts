@@ -13,7 +13,15 @@ export interface TransformResult {
   map: string;
 }
 
-/** Compile a single source file. Returns `null` for files without `@Component`. */
+/**
+ * Compile a single source file. Returns `null` for files without a
+ * provenance-matched `@Component` (they pass through the bundler untouched).
+ *
+ * @param code the source text
+ * @param id the file path (used for the JSX/TS script kind and sourcemap)
+ * @param opts compiler options (dev mode, JSX import source, runtime module)
+ * @returns the compiled code and sourcemap, or `null` to skip the file
+ */
 export const transform = (code: string, id: string, opts: TransformOptions = {}): TransformResult | null => {
   // Cheap substring pre-filter: bail before paying for a real parse when the
   // file couldn't possibly reference the runtime's `Component` decorator.

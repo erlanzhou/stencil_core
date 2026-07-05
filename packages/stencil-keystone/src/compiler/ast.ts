@@ -43,6 +43,24 @@ export const getDecoratorStringArg = (dec: ts.Decorator): string | undefined => 
 };
 
 /**
+ * The literal arguments of a decorator call — string literals as their text,
+ * a `null` literal as `null`, anything else as `undefined`. E.g.
+ * `@Controllable('a', 'b', 'c')` → `['a', 'b', 'c']`.
+ *
+ * @param dec the decorator to read
+ * @returns the decorator call's arguments, coerced to string/null/undefined
+ */
+export const getDecoratorArgs = (dec: ts.Decorator): (string | null | undefined)[] => {
+  const expr = dec.expression;
+  if (!ts.isCallExpression(expr)) {
+    return [];
+  }
+  return expr.arguments.map((arg) =>
+    ts.isStringLiteralLike(arg) ? arg.text : arg.kind === ts.SyntaxKind.NullKeyword ? null : undefined,
+  );
+};
+
+/**
  * Read a property from an object literal by name.
  *
  * @param obj the object literal to read from

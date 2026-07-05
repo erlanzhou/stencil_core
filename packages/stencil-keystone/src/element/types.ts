@@ -35,4 +35,12 @@ export interface ComponentRuntimeMeta {
    * shared across components is parsed once and reused.
    */
   $styles$?: string[];
+  /**
+   * `@Controllable` configs: each tuple is
+   * `[internalState, controlledProp, uncontrolledProp, changeEvent]`, wiring a
+   * controlled/uncontrolled merge. The first three names are reactive members
+   * (folded into the accessor set, so they need not repeat in `$members$`); the
+   * fourth is the `@Event` emitted on change (or `null` for none).
+   */
+  $controllable$?: [string, string, string, string | null][];
 }

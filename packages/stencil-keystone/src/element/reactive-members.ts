@@ -39,6 +39,12 @@ export const defineReactiveMembers = (Cstr: CustomElementConstructor, cmpMeta: C
     ...(cmpMeta.$members$ ?? []),
     ...Object.keys(cmpMeta.$defaults$ ?? {}),
     ...Object.keys(cmpMeta.$watched$ ?? {}),
+    // internal / controlled / uncontrolled names (not the change event) are members too
+    ...(cmpMeta.$controllable$ ?? []).flatMap(([internal, controlled, uncontrolled]) => [
+      internal,
+      controlled,
+      uncontrolled,
+    ]),
   ]);
 
   for (const memberName of memberNames) {

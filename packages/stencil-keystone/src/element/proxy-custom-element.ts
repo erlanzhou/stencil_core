@@ -1,4 +1,5 @@
 import type { HostElement } from '../internal/types';
+import { defineControllable, seedControllable } from './controllable';
 import { getHostRef, HOST_FLAGS } from './host-ref';
 import { defineReactiveMembers } from './reactive-members';
 import { attachStyles, registerStyles } from './styles';
@@ -18,9 +19,10 @@ import { scheduleUpdate } from './update-component';
  * @param tagName the component's tag name
  * @param Cstr the component constructor to augment
  * @param styles the component's CSS chunks
- * @param members the reactive member names not already implied by `defaults`/`watched`
+ * @param members the reactive member names not already implied by `defaults`/`watched`/`controllable`
  * @param defaults default values for `@Prop` members (its keys are also members)
  * @param watched maps a watched property to the method names that `@Watch` it
+ * @param controllable `@Controllable` merge configs (their member names are also members)
  * @returns the same constructor, augmented
  */
 export const proxyCustomElement = <T extends CustomElementConstructor>(
@@ -30,6 +32,7 @@ export const proxyCustomElement = <T extends CustomElementConstructor>(
   members?: string[],
   defaults?: Record<string, unknown>,
   watched?: Record<string, string[]>,
+  controllable?: [string, string, string, string | null][],
 ): T => {
   const cmpMeta: ComponentRuntimeMeta = {
     $tagName$: tagName,
@@ -37,9 +40,13 @@ export const proxyCustomElement = <T extends CustomElementConstructor>(
     $members$: members,
     $defaults$: defaults,
     $watched$: watched,
+    $controllable$: controllable,
   };
 
   defineReactiveMembers(Cstr, cmpMeta);
+  if (controllable) {
+    defineControllable(Cstr, cmpMeta);
+  }
 
   if (styles) {
     registerStyles(tagName, styles);
@@ -56,6 +63,12 @@ export const proxyCustomElement = <T extends CustomElementConstructor>(
     const hostRef = getHostRef(this)!;
     if (!(hostRef.$flags$ & HOST_FLAGS.hasConnected)) {
       hostRef.$flags$ |= HOST_FLAGS.hasConnected;
+      // Seed `@Controllable` state once, on first connect (framework props are
+      // set pre-mount). Re-seeding on every connect would reset controllable state
+      // when the element is moved/reconnected (e.g. React list reorder).
+      if (cmpMeta.$controllable$) {
+        seedControllable(this, cmpMeta);
+      }
       attachShadow(this);
       attachStyles(this, tagName);
       scheduleUpdate(hostRef);

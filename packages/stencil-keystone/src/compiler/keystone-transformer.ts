@@ -1,6 +1,13 @@
 import ts from 'typescript';
 
-import { getDecorator, getDecoratorObject, getDecoratorStringArg, getObjectProp, modifiersOf } from './ast';
+import {
+  getDecorator,
+  getDecoratorArgs,
+  getDecoratorObject,
+  getDecoratorStringArg,
+  getObjectProp,
+  modifiersOf,
+} from './ast';
 
 export interface ComponentContext {
   className: string;
@@ -10,6 +17,8 @@ export interface ComponentContext {
   /** `@Prop` initializers, keyed by member name (insertion order preserved). */
   defaults: Map<string, ts.Expression>;
   watched: Record<string, string[]>;
+  /** `@Controllable` merge configs: internal state, controlled/uncontrolled props, change event. */
+  controllable: { internal: string; controlled: string; uncontrolled: string; event: string | null }[];
   eventSeeds: ts.Statement[];
   propSeeds: ts.Statement[];
   usesCreateEvent: boolean;
@@ -23,7 +32,16 @@ export interface TransformerConfig {
  * Names imported from the runtime module that are compile-time-only markers with
  * no runtime export. After lowering they become dead imports and must be removed.
  */
-const COMPILE_TIME_NAMES = new Set(['Component', 'Prop', 'State', 'Watch', 'Event', 'Method', 'EventEmitter']);
+const COMPILE_TIME_NAMES = new Set([
+  'Component',
+  'Prop',
+  'State',
+  'Watch',
+  'Event',
+  'Method',
+  'EventEmitter',
+  'Controllable',
+]);
 
 /**
  * Local binding names imported as `Component` from the runtime module (honors `as` aliasing).
@@ -384,6 +402,7 @@ const transformComponentClass = (
     members: [],
     defaults: new Map(),
     watched: {},
+    controllable: [],
     eventSeeds: [],
     propSeeds: [],
     usesCreateEvent: false,
@@ -391,6 +410,17 @@ const transformComponentClass = (
 
   const kept = insertAutoKeys(collectMembers(node, f, ctx), f, context);
   const members = rebuildConstructor(kept, f, ctx);
+
+  // A controlled prop with a default would never read as `undefined`, so the
+  // merge could never enter uncontrolled mode.
+  for (const u of ctx.controllable) {
+    if (ctx.defaults.has(u.controlled)) {
+      throw new Error(
+        `@Controllable controlled prop "${u.controlled}" on "${ctx.className}" must not declare a default ` +
+          `(a default makes it always controlled).`,
+      );
+    }
+  }
 
   const heritage = node.heritageClauses?.length
     ? node.heritageClauses
@@ -429,6 +459,18 @@ const collectMembers = (node: ts.ClassDeclaration, f: ts.NodeFactory, ctx: Compo
       if (isProp || isState) {
         const name = member.name.text;
         ctx.members.push(name);
+        const controllable = getDecorator(member, 'Controllable');
+        if (controllable) {
+          const [controlled, uncontrolled, event] = getDecoratorArgs(controllable);
+          if (typeof controlled === 'string' && typeof uncontrolled === 'string') {
+            ctx.controllable.push({
+              internal: name,
+              controlled,
+              uncontrolled,
+              event: typeof event === 'string' ? event : null,
+            });
+          }
+        }
         if (member.initializer) {
           if (isProp) {
             // A `@Prop` default rides along in `proxyCustomElement`; the getter
@@ -568,9 +610,14 @@ const emitRegistration = (f: ts.NodeFactory, ctx: ComponentContext): ts.Statemen
   const nameLit = f.createStringLiteral(ctx.tagName);
   const classId = f.createIdentifier(ctx.className);
 
-  // `defaults` and `watched` keys are folded into the reactive member set by the
-  // runtime, so list in `members` only the names covered by neither.
-  const memberList = ctx.members.filter((m) => !ctx.defaults.has(m) && !Object.hasOwn(ctx.watched, m));
+  // `defaults`/`watched`/`uncontrolled` names are folded into the reactive member
+  // set by the runtime, so list in `members` only the names covered by none.
+  const controllableNames = new Set(
+    ctx.controllable.flatMap((u) => [u.internal, u.controlled, u.uncontrolled]),
+  );
+  const memberList = ctx.members.filter(
+    (m) => !ctx.defaults.has(m) && !Object.hasOwn(ctx.watched, m) && !controllableNames.has(m),
+  );
   const membersExpr = memberList.length
     ? f.createArrayLiteralExpression(memberList.map((m) => f.createStringLiteral(m)))
     : undefined;
@@ -594,7 +641,26 @@ const emitRegistration = (f: ts.NodeFactory, ctx: ComponentContext): ts.Statemen
       )
     : undefined;
 
-  const optional: (ts.Expression | undefined)[] = [ctx.styles, membersExpr, defaultsExpr, watchedExpr];
+  const controllableExpr = ctx.controllable.length
+    ? f.createArrayLiteralExpression(
+        ctx.controllable.map((u) =>
+          f.createArrayLiteralExpression([
+            f.createStringLiteral(u.internal),
+            f.createStringLiteral(u.controlled),
+            f.createStringLiteral(u.uncontrolled),
+            u.event ? f.createStringLiteral(u.event) : f.createNull(),
+          ]),
+        ),
+      )
+    : undefined;
+
+  const optional: (ts.Expression | undefined)[] = [
+    ctx.styles,
+    membersExpr,
+    defaultsExpr,
+    watchedExpr,
+    controllableExpr,
+  ];
   let last = optional.length;
   while (last > 0 && optional[last - 1] === undefined) last--;
   const tail = optional

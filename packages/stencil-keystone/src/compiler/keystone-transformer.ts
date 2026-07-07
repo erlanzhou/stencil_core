@@ -142,7 +142,11 @@ export const keystoneTransformer =
           imports.add('proxyCustomElement');
           imports.add('baseConstructor');
           if (ctx.usesCreateEvent) imports.add('createEvent');
-          registrations.push(...emitRegistration(f, ctx));
+          // `proxyCustomElement` runs inside the class's static block (see
+          // transformComponentClass) so it defines the reactive accessors before TS's
+          // `__decorate`. Only `customElements.define` is appended here — after the
+          // class and its `__decorate`, so the fully-decorated class is registered.
+          registrations.push(buildDefineStatement(f, ctx));
           return classNode;
         }
         if (ts.isImportDeclaration(node) && isRuntimeImport(node, config.runtimeModule)) {
@@ -375,7 +379,7 @@ const insertAutoKeys = (
  * @param f the node factory
  * @param componentNames local names known to bind the runtime `Component`
  * @param context the transformation context
- * @returns the rewritten class and the collected component context
+ * @returns the rewritten class declaration and the collected component context
  */
 const transformComponentClass = (
   node: ts.ClassDeclaration,
@@ -430,25 +434,97 @@ const transformComponentClass = (
         ]),
       ];
 
+  // `proxyCustomElement(tag, this, ...)` runs in a static block so it defines the
+  // reactive accessors DURING class definition — before TS emits `__decorate` for
+  // any surviving custom decorator — letting a legacy decorator wrap the accessor it
+  // just created (as it would under Stencil). `customElements.define` is emitted
+  // separately, after the class + `__decorate`.
+  const staticInit = f.createClassStaticBlockDeclaration(
+    f.createBlock([f.createExpressionStatement(buildProxyCall(f, ctx))], true),
+  );
+
   const classNode = f.updateClassDeclaration(
     node,
-    modifiersOf(node), // drops decorators (incl. @Component)
+    // strip only the provenance-matched @Component; keep any other (custom) class
+    // decorators and the `export` modifier on the declaration.
+    [...(ts.getDecorators(node) ?? []).filter((d) => d !== componentDec), ...(ts.getModifiers(node) ?? [])],
     node.name,
     node.typeParameters,
     heritage,
-    members,
+    [staticInit, ...members],
   );
 
   return { classNode, ctx };
 };
 
+/** The member decorators kstencil owns (and therefore strips). Everything else is left to run at runtime. */
+const RECOGNIZED_MEMBER_DECORATORS = new Set(['Prop', 'State', 'Watch', 'Event', 'Method', 'Controllable']);
+
 /**
- * Lower member decorators, populating `ctx`.
+ * Whether a decorator's identifier is one of `names`.
+ *
+ * @param dec the decorator to test
+ * @param names the decorator identifiers to match against
+ * @returns `true` when the decorator's identifier is in `names`
+ */
+const isNamedDecorator = (dec: ts.Decorator, names: Set<string>): boolean => {
+  const expr = dec.expression;
+  const id = ts.isCallExpression(expr) ? expr.expression : expr;
+  return ts.isIdentifier(id) && names.has(id.text);
+};
+
+/**
+ * The decorators on a node that are NOT in `names` (to be preserved for their runtime behavior).
+ *
+ * @param node the node whose decorators to filter
+ * @param names the decorator identifiers kstencil owns (to exclude)
+ * @returns the node's decorators that are not owned by kstencil
+ */
+const unrecognizedDecorators = (node: ts.HasDecorators, names: Set<string>): ts.Decorator[] =>
+  (ts.getDecorators(node) ?? []).filter((d) => !isNamedDecorator(d, names));
+
+/**
+ * Rebuild modifiers keeping the node's unrecognized decorators and dropping the ones in `names`.
+ *
+ * @param node the node whose decorators/modifiers to rebuild
+ * @param names the decorator identifiers to drop (kstencil's own)
+ * @returns the modifiers with kstencil's decorators removed and the rest preserved
+ */
+const keepUnrecognized = (node: ts.HasDecorators & ts.HasModifiers, names: Set<string>): ts.ModifierLike[] => [
+  ...unrecognizedDecorators(node, names),
+  ...(ts.getModifiers(node) ?? []),
+];
+
+/**
+ * A property declaration keeping only its unrecognized decorators (so they run at
+ * runtime) with the initializer removed — the value is already captured in
+ * `$defaults$` or a constructor seed. Under `useDefineForClassFields:false` a bare
+ * field emits no initializer, so it does not shadow the reactive accessor.
+ *
+ * @param member the decorated property declaration
+ * @param f the node factory
+ * @returns the bare property declaration carrying only its unrecognized decorators
+ */
+const keepDecoratedField = (member: ts.PropertyDeclaration, f: ts.NodeFactory): ts.PropertyDeclaration =>
+  f.updatePropertyDeclaration(
+    member,
+    keepUnrecognized(member, RECOGNIZED_MEMBER_DECORATORS),
+    member.name,
+    member.questionToken ?? member.exclamationToken,
+    member.type,
+    undefined,
+  );
+
+/**
+ * Lower member decorators, populating `ctx`. A member carrying only kstencil's own
+ * decorators is dropped (the runtime accessor / constructor seed backs it); a member
+ * that also carries unrecognized decorators is kept as a bare declaration so those
+ * decorators still run.
  *
  * @param node the component class whose members to process
  * @param f the node factory
  * @param ctx the component context to populate (members, watched, seeds)
- * @returns the class members to keep as-is (decorated fields are dropped)
+ * @returns the class members to keep
  */
 const collectMembers = (node: ts.ClassDeclaration, f: ts.NodeFactory, ctx: ComponentContext): ts.ClassElement[] => {
   const kept: ts.ClassElement[] = [];
@@ -486,7 +562,12 @@ const collectMembers = (node: ts.ClassDeclaration, f: ts.NodeFactory, ctx: Compo
             );
           }
         }
-        continue; // drop the field: the runtime accessor backs it
+        // Drop the field (runtime accessor backs it), unless it also carries a
+        // custom decorator — then keep a bare declaration so that decorator runs.
+        if (unrecognizedDecorators(member, RECOGNIZED_MEMBER_DECORATORS).length) {
+          kept.push(keepDecoratedField(member, f));
+        }
+        continue;
       }
       if (getDecorator(member, 'Event')) {
         const name = member.name.text;
@@ -502,7 +583,10 @@ const collectMembers = (node: ts.ClassDeclaration, f: ts.NodeFactory, ctx: Compo
             ),
           ),
         );
-        continue; // drop the field
+        if (unrecognizedDecorators(member, RECOGNIZED_MEMBER_DECORATORS).length) {
+          kept.push(keepDecoratedField(member, f));
+        }
+        continue;
       }
     }
     if (ts.isMethodDeclaration(member) && ts.isIdentifier(member.name)) {
@@ -526,16 +610,17 @@ const collectMembers = (node: ts.ClassDeclaration, f: ts.NodeFactory, ctx: Compo
 };
 
 /**
- * Return a method with all its decorators removed.
+ * Return a method with kstencil's own decorators (`@Watch`/`@Method`) removed and
+ * any unrecognized decorators preserved (so they run at runtime).
  *
  * @param member the method declaration to rebuild
  * @param f the node factory
- * @returns the method with its decorators stripped and everything else preserved
+ * @returns the method with only its unrecognized decorators, everything else preserved
  */
 const stripDecorators = (member: ts.MethodDeclaration, f: ts.NodeFactory): ts.MethodDeclaration =>
   f.updateMethodDeclaration(
     member,
-    modifiersOf(member), // drops decorators
+    keepUnrecognized(member, RECOGNIZED_MEMBER_DECORATORS), // keep unrecognized decorators
     member.asteriskToken,
     member.name,
     member.questionToken,
@@ -600,21 +685,18 @@ const dropSuper = (stmts: readonly ts.Statement[]): ts.Statement[] =>
   );
 
 /**
- * Emit `proxyCustomElement(...)` + `customElements.define(...)`, trailing empties omitted.
+ * Build the `proxyCustomElement(tag, this, ...)` call for a component's static block,
+ * trailing empty args omitted. `defaults`/`watched`/`controllable` names are folded
+ * into the reactive member set at runtime, so `members` lists only names covered by none.
  *
  * @param f the node factory
- * @param ctx the component context supplying the tag name, styles, members, and watched map
- * @returns the registration statements to append after the class
+ * @param ctx the component context (tag name, styles, members, defaults, watched, controllable)
+ * @returns the `proxyCustomElement(...)` call expression
  */
-const emitRegistration = (f: ts.NodeFactory, ctx: ComponentContext): ts.Statement[] => {
+const buildProxyCall = (f: ts.NodeFactory, ctx: ComponentContext): ts.CallExpression => {
   const nameLit = f.createStringLiteral(ctx.tagName);
-  const classId = f.createIdentifier(ctx.className);
 
-  // `defaults`/`watched`/`uncontrolled` names are folded into the reactive member
-  // set by the runtime, so list in `members` only the names covered by none.
-  const controllableNames = new Set(
-    ctx.controllable.flatMap((u) => [u.internal, u.controlled, u.uncontrolled]),
-  );
+  const controllableNames = new Set(ctx.controllable.flatMap((u) => [u.internal, u.controlled, u.uncontrolled]));
   const memberList = ctx.members.filter(
     (m) => !ctx.defaults.has(m) && !Object.hasOwn(ctx.watched, m) && !controllableNames.has(m),
   );
@@ -654,29 +736,26 @@ const emitRegistration = (f: ts.NodeFactory, ctx: ComponentContext): ts.Statemen
       )
     : undefined;
 
-  const optional: (ts.Expression | undefined)[] = [
-    ctx.styles,
-    membersExpr,
-    defaultsExpr,
-    watchedExpr,
-    controllableExpr,
-  ];
+  const optional: (ts.Expression | undefined)[] = [ctx.styles, membersExpr, defaultsExpr, watchedExpr, controllableExpr];
   let last = optional.length;
   while (last > 0 && optional[last - 1] === undefined) last--;
-  const tail = optional
-    .slice(0, last)
-    .map((e) => e ?? f.createIdentifier('undefined'));
+  const tail = optional.slice(0, last).map((e) => e ?? f.createIdentifier('undefined'));
 
-  return [
-    f.createExpressionStatement(
-      f.createCallExpression(f.createIdentifier('proxyCustomElement'), undefined, [nameLit, classId, ...tail]),
-    ),
-    f.createExpressionStatement(
-      f.createCallExpression(
-        f.createPropertyAccessExpression(f.createIdentifier('customElements'), 'define'),
-        undefined,
-        [f.createStringLiteral(ctx.tagName), classId],
-      ),
-    ),
-  ];
+  return f.createCallExpression(f.createIdentifier('proxyCustomElement'), undefined, [nameLit, f.createThis(), ...tail]);
 };
+
+/**
+ * Build `customElements.define(tag, ClassName)` for a component.
+ *
+ * @param f the node factory
+ * @param ctx the component context (tag name and class name)
+ * @returns the `customElements.define(...)` statement
+ */
+const buildDefineStatement = (f: ts.NodeFactory, ctx: ComponentContext): ts.Statement =>
+  f.createExpressionStatement(
+    f.createCallExpression(
+      f.createPropertyAccessExpression(f.createIdentifier('customElements'), 'define'),
+      undefined,
+      [f.createStringLiteral(ctx.tagName), f.createIdentifier(ctx.className)],
+    ),
+  );

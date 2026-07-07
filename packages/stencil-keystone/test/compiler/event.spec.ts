@@ -19,6 +19,6 @@ describe('compiler — @Event', () => {
     expect(out).toContain('createEvent');
     // not a reactive member, not in metadata
     expect(out).not.toMatch(/\[\s*"saved"\s*\]/);
-    expect(out).toMatch(/proxyCustomElement\(\s*"x-e"\s*,\s*XE\s*\)/);
+    expect(out).toMatch(/proxyCustomElement\(\s*"x-e"\s*,\s*this\s*\)/);
   });
 });

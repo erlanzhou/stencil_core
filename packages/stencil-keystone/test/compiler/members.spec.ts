@@ -20,7 +20,7 @@ describe('compiler — @Prop / @State', () => {
     // members; `count` (a @State) stays in members and is seeded in the constructor.
     // Positional order: (tag, Cstr, styles?, members?, defaults?, watched?).
     expect(out).toMatch(
-      /proxyCustomElement\(\s*"x-counter"\s*,\s*XCounter\s*,\s*undefined\s*,\s*\[\s*"count"\s*\]\s*,\s*\{\s*step\s*:\s*1\s*\}/,
+      /proxyCustomElement\(\s*"x-counter"\s*,\s*this\s*,\s*undefined\s*,\s*\[\s*"count"\s*\]\s*,\s*\{\s*step\s*:\s*1\s*\}/,
     );
     // @State initializer seeded per-instance; @Prop default is NOT a constructor seed
     expect(out).toMatch(/this\.count\s*=\s*0/);
@@ -36,7 +36,7 @@ describe('compiler — @Prop / @State', () => {
       export class XP { @Prop() label; render() { return null; } }
     `);
     // no initializer → no default object, just a members entry
-    expect(out).toMatch(/proxyCustomElement\(\s*"x-p"\s*,\s*XP\s*,\s*undefined\s*,\s*\[\s*"label"\s*\]\s*\)/);
+    expect(out).toMatch(/proxyCustomElement\(\s*"x-p"\s*,\s*this\s*,\s*undefined\s*,\s*\[\s*"label"\s*\]\s*\)/);
     expect(out).not.toMatch(/this\.label\s*=/);
   });
 });

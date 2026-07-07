@@ -49,11 +49,14 @@ export const transform = (code: string, id: string, opts: TransformOptions = {})
       module: ts.ModuleKind.ESNext,
       jsx: dev ? ts.JsxEmit.ReactJSXDev : ts.JsxEmit.ReactJSX,
       jsxImportSource,
-      useDefineForClassFields: true,
-      // Modern (TC39 standard) decorators, NOT legacy. We strip every decorator
-      // in the `before` transformer, so no decorator helpers are ever emitted;
-      // this is set explicitly to document intent and guard inherited config.
-      experimentalDecorators: false,
+      // Legacy (experimental) decorators + assignment-semantics class fields,
+      // matching the component library's tsconfig. `useDefineForClassFields:false`
+      // makes a class-field initializer a setter-routed assignment (not a shadowing
+      // define), so a reactive `@Prop` can coexist on the same field as a custom
+      // (legacy) decorator; the transformer strips only its OWN decorators and
+      // leaves unrecognized ones for TS to lower, so they run at runtime.
+      useDefineForClassFields: false,
+      experimentalDecorators: true,
       sourceMap: true,
     },
     transformers: { before: [keystoneTransformer({ runtimeModule })] },

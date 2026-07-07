@@ -20,7 +20,7 @@ describe('compiler — @Method', () => {
     expect(out).not.toContain('Method()');
     expect(out).toMatch(/async open\(\)/);
     // no metadata, no createEvent import triggered
-    expect(out).toMatch(/proxyCustomElement\(\s*"x-m"\s*,\s*XM\s*\)/);
+    expect(out).toMatch(/proxyCustomElement\(\s*"x-m"\s*,\s*this\s*\)/);
     expect(out).not.toContain('createEvent');
   });
 });

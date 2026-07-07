@@ -24,7 +24,7 @@ describe('compiler — @Component', () => {
     expect(out).toContain('extends HTMLElement');
     expect(out).toMatch(/constructor\(\)\s*{[\s\S]*super\(\)[\s\S]*baseConstructor\(this\)/);
     // registration tail, styles forwarded as arg 3
-    expect(out).toMatch(/proxyCustomElement\(\s*"x-foo"\s*,\s*XFoo\s*,\s*\[":host\{color:red\}"\]/);
+    expect(out).toMatch(/proxyCustomElement\(\s*"x-foo"\s*,\s*this\s*,\s*\[":host\{color:red\}"\]/);
     expect(out).toMatch(/customElements\.define\(\s*"x-foo"\s*,\s*XFoo\s*\)/);
     // runtime import injected
     expect(out).toContain('proxyCustomElement');

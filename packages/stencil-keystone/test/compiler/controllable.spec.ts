@@ -22,7 +22,7 @@ describe('compiler — @Controllable', () => {
     // all three merged member names are folded into the runtime member set, so
     // `members` is empty; the config rides as the 7th positional arg.
     expect(out).toMatch(
-      /proxyCustomElement\(\s*"x-collapse"\s*,\s*XCollapse\s*,\s*undefined\s*,\s*undefined\s*,\s*undefined\s*,\s*undefined\s*,\s*\[\s*\[\s*"internalCollapsed"\s*,\s*"collapsed"\s*,\s*"defaultCollapsed"\s*,\s*"ksCollapsedChange"\s*\]\s*\]/,
+      /proxyCustomElement\(\s*"x-collapse"\s*,\s*this\s*,\s*undefined\s*,\s*undefined\s*,\s*undefined\s*,\s*undefined\s*,\s*\[\s*\[\s*"internalCollapsed"\s*,\s*"collapsed"\s*,\s*"defaultCollapsed"\s*,\s*"ksCollapsedChange"\s*\]\s*\]/,
     );
     // decorator and its compile-time-only import are stripped
     expect(out).not.toContain('@Controllable');

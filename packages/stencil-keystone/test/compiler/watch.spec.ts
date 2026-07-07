@@ -19,7 +19,7 @@ describe('compiler — @Watch', () => {
     // `value` is a @Prop default AND watched, so it appears in neither members
     // (it's covered by both) — members is empty. Order: styles, members, defaults, watched.
     expect(out).toMatch(
-      /proxyCustomElement\(\s*"x-w"\s*,\s*XW\s*,\s*undefined\s*,\s*undefined\s*,\s*\{\s*value\s*:\s*0\s*\}\s*,\s*\{\s*"value"\s*:\s*\[\s*"onValueChange"\s*\]\s*\}/,
+      /proxyCustomElement\(\s*"x-w"\s*,\s*this\s*,\s*undefined\s*,\s*undefined\s*,\s*\{\s*value\s*:\s*0\s*\}\s*,\s*\{\s*"value"\s*:\s*\[\s*"onValueChange"\s*\]\s*\}/,
     );
     // method body preserved, decorator gone
     expect(out).toContain('onValueChange');

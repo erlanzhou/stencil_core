@@ -43,6 +43,10 @@ export const proxyCustomElement = <T extends CustomElementConstructor>(
     $controllable$: controllable,
   };
 
+  // Tag the constructor so a JSX component reference (`<MyButton/>` → an imported
+  // component value) can resolve to its custom-element tag in `h`.
+  (Cstr as unknown as { $ksTag$?: string }).$ksTag$ = tagName;
+
   defineReactiveMembers(Cstr, cmpMeta);
   if (controllable) {
     defineControllable(Cstr, cmpMeta);

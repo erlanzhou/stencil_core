@@ -16,6 +16,18 @@ const IS_DEV = process.env.NODE_ENV === 'development';
 // export function h(nodeName: string | FunctionalComponent, vnodeData: PropsType, child?: ChildType): VNode;
 // export function h(nodeName: string | FunctionalComponent, vnodeData: PropsType, ...children: ChildType[]): VNode;
 export const h = (nodeName: any, vnodeData: any, ...children: ChildType[]): VNode => {
+  // A keystone component reference (an imported component value carrying `$ksTag$`)
+  // renders as its custom-element tag. Resolve it up front — before children are
+  // walked — so children are handled as element children, not functional-component
+  // args. Lazily register it too, so a referenced component works even if its own
+  // module's `customElements.define` was tree-shaken.
+  if (typeof nodeName === 'function' && nodeName.$ksTag$) {
+    const Cstr = nodeName as CustomElementConstructor & { $ksTag$: string };
+    nodeName = Cstr.$ksTag$;
+    if (typeof customElements !== 'undefined' && !customElements.get(nodeName)) {
+      customElements.define(nodeName, Cstr);
+    }
+  }
   let child: any = null;
   let key: string | null = null;
   let simple = false;

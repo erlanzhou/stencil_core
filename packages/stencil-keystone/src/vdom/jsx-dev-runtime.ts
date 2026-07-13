@@ -12,6 +12,9 @@
 import { jsx } from './jsx-runtime';
 
 export { Fragment } from '../internal/fragment';
+// Re-export the JSX type surface so `react-jsxdev` mode (which resolves JSX types
+// from this module) shares the exact same namespace as the production runtime.
+export type { JSX } from './jsx-runtime';
 
 /**
  * JSX development runtime function for creating elements with debug info.

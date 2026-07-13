@@ -44,6 +44,43 @@ export interface FunctionalComponent<T = Record<string, unknown>> {
 }
 
 /**
+ * Anything usable as JSX children of a keystone component: vnodes, primitives,
+ * booleans/nullish (ignored), and nested arrays thereof. Deliberately generic —
+ * like Stencil's React output target, slots are not typed individually.
+ */
+export type VNodeChildren = ChildType | boolean | null | undefined | VNodeChildren[];
+
+/**
+ * The framework-managed props every keystone component accepts in JSX, on top of
+ * its own `@Prop`s: children, a diff `key`, and a callback `ref` that receives the
+ * host element (typed with its `@Method` surface) or `null`.
+ *
+ * @typeParam Methods the imperative methods (`@Method`) exposed on the host element
+ */
+export interface KeystoneNodeAttrs<Methods = unknown> {
+  children?: VNodeChildren;
+  key?: string | number;
+  ref?: (el: (Methods & HTMLElement) | null) => void;
+}
+
+/**
+ * The JSX-facing type of a compiled keystone component reference. The runtime
+ * value is the component's class (tagged with `$ksTag$` by `proxyCustomElement`);
+ * the compiler retypes the emitted `.d.ts` export as this so `<MyButton .../>`
+ * type-checks its `@Prop`s and `on*` `@Event` handlers. It is shaped as a
+ * function component so TS's JSX support reads the call signature's parameter as
+ * the element's attributes.
+ *
+ * @typeParam Props the component's props: its `@Prop`s plus `on*` handlers from `@Event`s
+ * @typeParam Methods the imperative surface exposed via a `ref` (from `@Method`s)
+ */
+export interface KeystoneComponent<Props = Record<string, never>, Methods = unknown> {
+  (props: Props & KeystoneNodeAttrs<Methods>): VNode;
+  /** The component's custom-element tag; `h` resolves a reference to it. */
+  $ksTag$: string;
+}
+
+/**
  * An element that hosts a rendered vdom tree. The open index signature covers
  * the non-standard `s-*` bookkeeping members the hydration path reads/writes.
  */

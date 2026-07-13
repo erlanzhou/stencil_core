@@ -4,9 +4,12 @@ export type {
   ChildType,
   FunctionalComponent,
   HostElement,
+  KeystoneComponent,
+  KeystoneNodeAttrs,
   PropsType,
   RenderNode,
   VNode,
+  VNodeChildren,
   VNodeData,
 } from './internal/types';
 export { h, Host, isHost, newVNode } from './vdom/h';

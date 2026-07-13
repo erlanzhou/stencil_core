@@ -9,9 +9,36 @@
  * https://www.typescriptlang.org/docs/handbook/jsx.html
  */
 
+import type { VNode, VNodeChildren } from '../internal/types';
 import { h } from './h';
 
 export { Fragment } from '../internal/fragment';
+
+/**
+ * The JSX type surface for the automatic runtime. When a component library sets
+ * `jsxImportSource: 'stencil-keystone'`, TypeScript resolves JSX types from this
+ * module's `JSX` namespace. A compiled component reference (`KeystoneComponent`)
+ * is a function type, so it is a valid `JSX.ElementType` and its call-signature
+ * parameter types the element's attributes. Host tags are kept permissive.
+ */
+export namespace JSX {
+  export type Element = VNode;
+
+  /** Names the prop TS routes JSX children into (matches `KeystoneNodeAttrs.children`). */
+  export interface ElementChildrenAttribute {
+    children: Record<string, never>;
+  }
+
+  /** Props allowed on every element (a diff `key`). */
+  export interface IntrinsicAttributes {
+    key?: string | number;
+  }
+
+  /** Host (built-in) elements are intentionally untyped for now. */
+  export interface IntrinsicElements {
+    [tagName: string]: { [attr: string]: unknown; children?: VNodeChildren };
+  }
+}
 
 /**
  * JSX runtime function for creating elements in production mode.

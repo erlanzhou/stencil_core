@@ -50,7 +50,7 @@ const COMPILE_TIME_NAMES = new Set([
  * @param runtimeModule the module specifier the runtime is imported from
  * @returns the set of local identifiers bound to the runtime's `Component`
  */
-const collectComponentNames = (sf: ts.SourceFile, runtimeModule: string): Set<string> => {
+export const collectComponentNames = (sf: ts.SourceFile, runtimeModule: string): Set<string> => {
   const names = new Set<string>();
   for (const stmt of sf.statements) {
     if (
@@ -79,7 +79,10 @@ const collectComponentNames = (sf: ts.SourceFile, runtimeModule: string): Set<st
  * @param componentNames local names known to bind the runtime `Component`
  * @returns the matching decorator, or `undefined` if the class has none
  */
-const getComponentDecorator = (node: ts.ClassDeclaration, componentNames: Set<string>): ts.Decorator | undefined =>
+export const getComponentDecorator = (
+  node: ts.ClassDeclaration,
+  componentNames: Set<string>,
+): ts.Decorator | undefined =>
   ts.getDecorators(node)?.find((d) => {
     const expr = d.expression;
     const id = ts.isCallExpression(expr) ? expr.expression : expr;

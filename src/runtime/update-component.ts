@@ -45,7 +45,20 @@ export const scheduleUpdate = (hostRef: d.HostRef, isInitialLoad: boolean): Prom
     return;
   }
 
-  return BUILD.taskQueue ? writeTask(dispatch) : dispatch();
+  if (BUILD.taskQueue) {
+    return writeTask(dispatch);
+  }
+
+  // taskQueue: 'immediate' — dispatch synchronously, EXCEPT when this host is already
+  // mid-update (a lifecycle callback or @Watch re-entered scheduleUpdate). In that case
+  // defer the dispatch to a microtask so the follow-up render runs after the current
+  // cycle unwinds, instead of synchronously recursing into the in-flight render/patch
+  // (which corrupts it: "Cannot read properties of null (reading 'nodeType')").
+  if (hostRef.$flags$ & HOST_FLAGS.isUpdating) {
+    return nextTick(dispatch);
+  }
+
+  return dispatch();
 };
 
 /**
@@ -80,6 +93,15 @@ const dispatchHooks = (hostRef: d.HostRef, isInitialLoad: boolean): Promise<void
         'Make sure this imported component is compiled with a `externalRuntime: true` flag. ' +
         'For more information, please refer to https://stenciljs.com/docs/custom-elements#externalruntime',
     );
+  }
+
+  // Mark this host's update cycle as in-progress. Under taskQueue:'immediate' this lets
+  // a reentrant scheduleUpdate (from a lifecycle callback / @Watch that writes state)
+  // defer to a microtask rather than synchronously recursing. Only relevant when renders
+  // dispatch synchronously, so it's gated to non-`taskQueue` (immediate) builds. Cleared
+  // at the end of `postUpdateComponent`.
+  if (!BUILD.taskQueue) {
+    hostRef.$flags$ |= HOST_FLAGS.isUpdating;
   }
 
   // We're going to use this variable together with `enqueue` to implement a
@@ -401,6 +423,12 @@ export const postUpdateComponent = (hostRef: d.HostRef) => {
       nextTick(() => scheduleUpdate(hostRef, false));
     }
     hostRef.$flags$ &= ~(HOST_FLAGS.isWaitingForChildren | HOST_FLAGS.needsRerender);
+  }
+
+  // The host's update cycle is complete; clear the in-progress flag set in
+  // `dispatchHooks` so subsequent (non-reentrant) immediate updates dispatch synchronously.
+  if (!BUILD.taskQueue) {
+    hostRef.$flags$ &= ~HOST_FLAGS.isUpdating;
   }
   // ( •_•)
   // ( •_•)>⌐■-■

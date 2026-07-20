@@ -56,6 +56,10 @@ export const enum HOST_FLAGS {
   isWatchReady = 1 << 7,
   isListenReady = 1 << 8,
   needsRerender = 1 << 9,
+  // set while a host's update cycle (dispatchHooks → postUpdateComponent) is running,
+  // so a reentrant scheduleUpdate under taskQueue:'immediate' can be deferred instead
+  // of synchronously recursing into the in-flight render/patch.
+  isUpdating = 1 << 12,
 
   // DEV ONLY
   devOnRender = 1 << 10,
